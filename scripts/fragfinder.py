@@ -1,17 +1,27 @@
 import sys
 import rdkit
-from rdkit import Chem
+from rdkit import Chem, rdBase
 from rdkit.Chem import AllChem #used for 3d coordinates
+from rdkit.Chem import Draw,rdDepictor
+from rdkit.Chem.Draw import IPythonConsole, rdMolDraw2D
 from rdkit.Chem.Scaffolds import rdScaffoldNetwork # scaffolding
 from rdkit import RDPaths
+from rdkit.Chem.Draw import rdMolDraw2D
+import math
+import matplotlib as mpl
+from matplotlib import pyplot as plt
 import os
+import pyvis
+from pyvis.network import Network
+import inspect
+from IPython import display
+from IPython.display import SVG
 import pandas as pd #lots of work with data frames
 from rdkit.Chem import PandasTools # Smiles and molecule  integration with Pandas
 from rdkit.Chem import rdqueries # search for rdScaffoldAttachment points * to remove
 import numpy as np #for arrays in fragment identification
-ifg_path = os.path.join(RDPaths.RDContribDir, 'IFG') #identifying functional groups via Ertl
 sys.path.append('/Users/chemlab/Documents/Retrievium Work/Scaffolding/Coding Workspace/scripts')
-import scripts.ifg as ifg
+import ifg as ifg
 
 def get_canonical_molecule(smile: str):
     """Ensures that molecule numbering is consistent with creating molecule from canonical SMILES for consistency."""
@@ -409,15 +419,79 @@ def identify_fragments(smile: str):
     #print(fragFrame)
     return fragFrame
 
-def find_molpart_bonds(molFrame,molPart):
+def find_molpart_bonds(molFrame,molPart,molecule):
     atomsInMolPart = molFrame.loc[molFrame['molPart'] == molPart,:].index
     neighbouring=[]
     for atom in atomsInMolPart:
-        for neigh in atom.GetNeighbours():
+        for neigh in molecule.GetAtomWithIdx(atom).GetNeighbors():
             if neigh.GetIdx() not in atomsInMolPart:
                 neighbouring.append(neigh.GetIdx())
     return neighbouring            
 
+def copy_molecule(molecule):
+    molSmi = Chem.MolToSmiles(molecule)
+    return Chem.MolFromSmiles(molSmi)
+
+
+def trim_connections(molFrame,molPart,molPart_bonded,molecule,count,connectivityDict):
+    copied_mol = copy_molecule(molecule)
+    outSegment = list(molFrame.loc[molFrame['molPart'] == molPart,:].index)
+    connectivityKeys = list(connectivityDict.keys())
+    for atom in molPart_bonded:
+        outSegment.append(atom)
+        bondedPart = molFrame['molPart'][atom]
+        if bondedPart in connectivityKeys:
+            bondedKeys = list(connectivityDict[bondedPart].keys())
+            if molPart in bondedKeys:
+                bondLabel = connectivityDict[bondedPart][molPart]
+                if molPart in connectivityKeys:
+                    connectivityDict[molPart].update({bondedPart:bondLabel})
+                else:    
+                    connectivityDict.update({molPart:{bondedPart:bondLabel}})
+                    connectivityKeys.append(molPart)
+        else:
+            bondLabel=count
+            count = count + 1
+            if molPart in connectivityKeys:
+                connectivityDict[molPart].update({bondedPart:bondLabel})
+            else:    
+                connectivityDict.update({molPart:{bondedPart:bondLabel}})
+                connectivityKeys.append(molPart)
+        copied_mol.GetAtomWithIdx(atom).SetAtomicNum(0)
+        copied_mol.GetAtomWithIdx(atom).SetProp('atomLabel', '{count}'.format(count=bondLabel))
+    trimSmi = Chem.MolFragmentToCXSmiles(copied_mol,atomsToUse=outSegment)
+    trimSmi = clean_smile(trimSmi)
+    #loop over bonmded, set one to zero, write to smiles, replace * with [*count], iterate count, read molecule, continue to next bonded    
+    return {'smiles':trimSmi, 'count':count, 'connectivityDict':connectivityDict}
+
+def clean_smile(trimSmi):
+    trimSmi = trimSmi.replace('[*H]','*')
+    trimSmi = trimSmi.replace('[*H3]','*')
+    trimSmi = trimSmi.replace('[*H2]','*')
+    trimSmi = trimSmi.replace('[*H+]','*')  
+    trimSmi = trimSmi.replace('[*H3+]','*')
+    trimSmi = trimSmi.replace('[*H2+]','*')
+    trimSmi = trimSmi.replace('[*H-]','*')  
+    trimSmi = trimSmi.replace('[*H3-]','*')
+    trimSmi = trimSmi.replace('[*H2-]','*')
+    return trimSmi
+
+def find_connected_smiles(molFrame,mol):
+    outSmi=[]
+    uniqueMolParts = molFrame['molPart'].unique()
+    connectivityDict = {}
+    count=1
+    for molPart in uniqueMolParts:
+        molPart_bonded = find_molpart_bonds(molFrame,molPart,mol)
+        trimmedConnections = trim_connections(molFrame,molPart,molPart_bonded,mol,count,connectivityDict)
+        outSmi.append(trimmedConnections['smiles'])
+        count  = trimmedConnections['count']
+        connectivityDict = trimmedConnections['connectivityDict']
+    return outSmi
+
 def identify_connected_fragments(smile: str):
     mol = get_canonical_molecule(smile)
     molFrame = generate_full_molFrame(mol)
+    fragmentSmiles = find_connected_smiles(molFrame,mol)
+    fragFrame = generate_fragment_frame(fragmentSmiles)
+    return fragFrame
