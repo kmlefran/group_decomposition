@@ -1,5 +1,6 @@
 import sys
 import rdkit
+import re
 from rdkit import Chem, rdBase
 from rdkit.Chem import AllChem #used for 3d coordinates
 from rdkit.Chem import Draw,rdDepictor
@@ -419,21 +420,152 @@ def identify_fragments(smile: str):
     #print(fragFrame)
     return fragFrame
 
-def find_molpart_bonds(molFrame,molPart,molecule):
-    atomsInMolPart = molFrame.loc[molFrame['molPart'] == molPart,:].index
-    neighbouring=[]
-    for atom in atomsInMolPart:
-        for neigh in molecule.GetAtomWithIdx(atom).GetNeighbors():
-            if neigh.GetIdx() not in atomsInMolPart:
-                neighbouring.append(neigh.GetIdx())
-    return neighbouring            
+          
+
+
+
 
 def copy_molecule(molecule):
     molSmi = Chem.MolToSmiles(molecule)
     return Chem.MolFromSmiles(molSmi)
 
 
+
+def clean_smile(trimSmi):
+    trimSmi = trimSmi.replace('[*H]','*')
+    trimSmi = trimSmi.replace('[*H3]','*')
+    trimSmi = trimSmi.replace('[*H2]','*')
+    trimSmi = trimSmi.replace('[*H+]','*')  
+    trimSmi = trimSmi.replace('[*H3+]','*')
+    trimSmi = trimSmi.replace('[*H2+]','*')
+    trimSmi = trimSmi.replace('[*H-]','*')  
+    trimSmi = trimSmi.replace('[*H3-]','*')
+    trimSmi = trimSmi.replace('[*H2-]','*')
+    return trimSmi
+
+def trim_molpart(molFrame,molPartList,molecule):
+    #will return with connections set to count:*, not labeled
+    count=1
+    bonds = []
+    labels = []
+    for molPart in molPartList:
+        atomsInMolPart = molFrame.loc[molFrame['molPart'] == molPart,:].index
+        for atom in atomsInMolPart:
+            aidx = molecule.GetAtomWithIdx(atom).GetIdx()
+            for neigh in molecule.GetAtomWithIdx(atom).GetNeighbors():
+                nidx = neigh.GetIdx()
+                if nidx not in atomsInMolPart:
+                    b = molecule.GetBondBetweenAtoms(aidx,nidx)
+                    if b.GetIdx() not in bonds:
+                        bonds.append(b.GetIdx())
+                        labels.append([count,count])
+                        count  = count+1
+    print(bonds)
+    print(labels)
+    fragMol = Chem.FragmentOnBonds(molecule,bondIndices=bonds,dummyLabels=labels)
+    splitSmiles  = Chem.MolToSmiles(fragMol).split('.')#remove molecule from fragframe, add fragments
+    return {'smiles':splitSmiles, 'count':count}
+
+
+def break_molparts(molPartSmi,count):
+    elToRM = []
+    newSmi=[]
+    for i,partsmi in enumerate(molPartSmi):
+        molecule = Chem.MolFromSmiles(partsmi)
+        if molecule.GetRingInfo().NumRings() == 0: #don't do this for rings
+            bondsToBreak = molecule.GetSubstructMatches(Chem.MolFromSmarts('[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0]):2]'))
+            bonds = []
+            labels = []
+            for bond in bondsToBreak:
+                b = molecule.GetBondBetweenAtoms(bond[0],bond[1])
+                bonds.append(b.GetIdx())
+                labels.append([count,count])
+                count  = count+1
+            if bonds:
+                elToRM.append(i)
+                fragMol = Chem.FragmentOnBonds(molecule,bondIndices=bonds,dummyLabels=labels)
+                splitSmiles  = Chem.MolToSmiles(fragMol).split('.')#remove molecule from fragframe, add fragments
+                for split in splitSmiles:
+                    newSmi.append(split)             
+    elToRM = sorted(elToRM,reverse=True)
+    for el in elToRM:
+        del molPartSmi[el]
+    outSmi  = molPartSmi + newSmi
+    return outSmi        
+
+
+
+
+def identify_connected_fragments(smile: str):
+    mol = get_canonical_molecule(smile)
+    molFrame = generate_full_molFrame(mol)
+    fragmentSmiles = trim_molpart(molFrame,molFrame['molPart'].unique(),mol)
+    fullSmi = break_molparts(fragmentSmiles['smiles'],fragmentSmiles['count'])
+    fragFrame = generate_fragment_frame(fullSmi)
+    fragFrame = add_xyz_coords(fragFrame)
+    fragFrame = add_number_attachements(fragFrame)
+    return fragFrame
+
+def count_uniques(fragFrame,dropAttachements=False):
+    smileList = fragFrame['Smiles']
+    noConnectSmile=[]
+    for smile in smileList:
+        if dropAttachements:
+            mol = Chem.MolFromSmiles(smile)
+            nonZeroAtoms=0
+            for atom in mol.GetAtoms():
+                if atom.GetAtomicNum() != 0:
+                    nonZeroAtoms += 1
+            if nonZeroAtoms > 1:
+                temp= re.sub('\[[0-9]+\*\]', '', smile)
+                noConnectSmile.append(re.sub('\(\)', '', temp))
+            else:
+                noConnectSmile.append(re.sub('\[[0-9]+\*\]', '*', smile))
+        else:
+            noConnectSmile.append(re.sub('\[[0-9]+\*\]', '*', smile))
+    uniqueSmiles=[]
+    uniqueSmilesCounts=[]
+    for smile in noConnectSmile:
+        if smile not in uniqueSmiles:
+            uniqueSmiles.append(smile)
+            uniqueSmilesCounts.append(1)
+        else:
+            print(uniqueSmiles)
+            ix = uniqueSmiles.index(smile)
+            print(ix)
+            uniqueSmilesCounts[ix] += 1        
+    uniqueFragFrame = pd.DataFrame(uniqueSmiles,columns=['Smiles']) #here is where we subset to unique
+    PandasTools.AddMoleculeColumnToFrame(uniqueFragFrame,'Smiles','Molecule',includeFingerprints=True)
+    uniqueFragFrame['count']=uniqueSmilesCounts
+    return uniqueFragFrame
+
+def find_connected_smiles(molFrame,mol):
+    #deprecated, nto used
+    outSmi=[]
+    uniqueMolParts = molFrame['molPart'].unique()
+    connectivityDict = {}
+    count=1
+    for molPart in uniqueMolParts:
+        molPart_bonded = find_molpart_bonds(molFrame,molPart,mol)
+        trimmedConnections = trim_connections(molFrame,molPart,molPart_bonded,mol,count,connectivityDict)
+        outSmi.append(trimmedConnections['smiles'])
+        count  = trimmedConnections['count']
+        connectivityDict = trimmedConnections['connectivityDict']
+    return {'smiles':outSmi,'count':count}
+
+def find_molpart_bonds(molFrame,molPart,molecule):
+    #deprecated, not used
+    atomsInMolPart = molFrame.loc[molFrame['molPart'] == molPart,:].index
+    neighbouring=[]
+    for atom in atomsInMolPart:
+        for neigh in molecule.GetAtomWithIdx(atom).GetNeighbors():
+            if neigh.GetIdx() not in atomsInMolPart:
+                neighbouring.append(neigh.GetIdx())
+    return neighbouring  
+
 def trim_connections(molFrame,molPart,molPart_bonded,molecule,count,connectivityDict):
+    """Deprecated function, not used."""
+    #will return with atom property label set to count
     copied_mol = copy_molecule(molecule)
     outSegment = list(molFrame.loc[molFrame['molPart'] == molPart,:].index)
     connectivityKeys = list(connectivityDict.keys())
@@ -463,35 +595,3 @@ def trim_connections(molFrame,molPart,molPart_bonded,molecule,count,connectivity
     trimSmi = clean_smile(trimSmi)
     #loop over bonmded, set one to zero, write to smiles, replace * with [*count], iterate count, read molecule, continue to next bonded    
     return {'smiles':trimSmi, 'count':count, 'connectivityDict':connectivityDict}
-
-def clean_smile(trimSmi):
-    trimSmi = trimSmi.replace('[*H]','*')
-    trimSmi = trimSmi.replace('[*H3]','*')
-    trimSmi = trimSmi.replace('[*H2]','*')
-    trimSmi = trimSmi.replace('[*H+]','*')  
-    trimSmi = trimSmi.replace('[*H3+]','*')
-    trimSmi = trimSmi.replace('[*H2+]','*')
-    trimSmi = trimSmi.replace('[*H-]','*')  
-    trimSmi = trimSmi.replace('[*H3-]','*')
-    trimSmi = trimSmi.replace('[*H2-]','*')
-    return trimSmi
-
-def find_connected_smiles(molFrame,mol):
-    outSmi=[]
-    uniqueMolParts = molFrame['molPart'].unique()
-    connectivityDict = {}
-    count=1
-    for molPart in uniqueMolParts:
-        molPart_bonded = find_molpart_bonds(molFrame,molPart,mol)
-        trimmedConnections = trim_connections(molFrame,molPart,molPart_bonded,mol,count,connectivityDict)
-        outSmi.append(trimmedConnections['smiles'])
-        count  = trimmedConnections['count']
-        connectivityDict = trimmedConnections['connectivityDict']
-    return outSmi
-
-def identify_connected_fragments(smile: str):
-    mol = get_canonical_molecule(smile)
-    molFrame = generate_full_molFrame(mol)
-    fragmentSmiles = find_connected_smiles(molFrame,mol)
-    fragFrame = generate_fragment_frame(fragmentSmiles)
-    return fragFrame
