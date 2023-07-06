@@ -464,7 +464,10 @@ def trim_molpart(molFrame,molPartList,molecule):
     print(labels)
     fragMol = Chem.FragmentOnBonds(molecule,bondIndices=bonds,dummyLabels=labels)
     splitSmiles  = Chem.MolToSmiles(fragMol).split('.')#remove molecule from fragframe, add fragments
-    return {'smiles':splitSmiles, 'count':count}
+    newSmi=[]
+    for split in splitSmiles:
+        newSmi.append(Chem.MolToSmiles(Chem.MolFromSmiles(split)))
+    return {'smiles':newSmi, 'count':count}
 
 
 def break_molparts(molPartSmi,count):
@@ -486,7 +489,7 @@ def break_molparts(molPartSmi,count):
                 fragMol = Chem.FragmentOnBonds(molecule,bondIndices=bonds,dummyLabels=labels)
                 splitSmiles  = Chem.MolToSmiles(fragMol).split('.')#remove molecule from fragframe, add fragments
                 for split in splitSmiles:
-                    newSmi.append(split)             
+                    newSmi.append(Chem.MolToSmiles(Chem.MolFromSmiles(split)))
     elToRM = sorted(elToRM,reverse=True)
     for el in elToRM:
         del molPartSmi[el]
@@ -518,11 +521,11 @@ def count_uniques(fragFrame,dropAttachements=False):
                     nonZeroAtoms += 1
             if nonZeroAtoms > 1:
                 temp= re.sub('\[[0-9]+\*\]', '', smile)
-                noConnectSmile.append(re.sub('\(\)', '', temp))
+                noConnectSmile.append(Chem.MolToSmiles(Chem.MolFromSmiles(re.sub('\(\)', '', temp))))
             else:
-                noConnectSmile.append(re.sub('\[[0-9]+\*\]', '*', smile))
+                noConnectSmile.append(Chem.MolToSmiles(Chem.MolFromSmiles(re.sub('\[[0-9]+\*\]', '*', smile))))
         else:
-            noConnectSmile.append(re.sub('\[[0-9]+\*\]', '*', smile))
+            noConnectSmile.append(Chem.MolToSmiles(Chem.MolFromSmiles(re.sub('\[[0-9]+\*\]', '*', smile))))
     uniqueSmiles=[]
     uniqueSmilesCounts=[]
     for smile in noConnectSmile:
@@ -538,6 +541,58 @@ def count_uniques(fragFrame,dropAttachements=False):
     PandasTools.AddMoleculeColumnToFrame(uniqueFragFrame,'Smiles','Molecule',includeFingerprints=True)
     uniqueFragFrame['count']=uniqueSmilesCounts
     return uniqueFragFrame
+
+def mergeUniques(frame1,frame2):
+    madeFrame=0
+    rowsToDropOne = []
+    rowsToDropTwo = []
+    for i,smi in enumerate(frame1['Smiles']):
+        if smi in list(frame2['Smiles']):
+            j=list(frame2['Smiles']).index(smi)
+            cumCount=frame1['count'][i] + frame2['count'][j]
+            if madeFrame == 0:
+                mergeFrame = pd.DataFrame.from_dict({'Smiles':[smi],'count':[cumCount]})
+                madeFrame=1
+            else:
+                mergeFrame.loc[len(mergeFrame)] = [smi, cumCount]
+            rowsToDropOne.append(i)
+            rowsToDropTwo.append(j)
+    print(rowsToDropTwo)
+    print(rowsToDropOne)
+    dropframe1 = frame1.drop(rowsToDropOne)
+    dropframe2 = frame2.drop(rowsToDropTwo)
+    print(frame1)
+    print(frame2)
+    for i,smi in enumerate(dropframe1['Smiles']):
+        if madeFrame == 0:
+            mergeFrame = pd.DataFrame.from_dict({'Smiles':[smi],'count':list(dropframe1['count'])[i]})
+            madeFrame=1
+        else:
+            print(mergeFrame)
+            print(len(mergeFrame))
+            print(smi)
+            print(frame1['count'][i])
+            mergeFrame.loc[len(mergeFrame)] = [smi, list(dropframe1['count'])[i]]
+    for i,smi in enumerate(dropframe2['Smiles']):
+        if madeFrame == 0:
+            mergeFrame = pd.DataFrame.from_dict({'Smiles':[smi],'count':list(dropframe2['count'])[i]})
+            madeFrame=1
+        else:
+            mergeFrame.loc[len(mergeFrame)] = [smi, list(dropframe2['count'])[i]]           
+    return mergeFrame
+
+def count_groups_in_set(listOfSmiles,dropAttachements):
+    i=0
+    for smile in listOfSmiles:
+        frame = identify_connected_fragments(smile)
+        uniqueFrame = count_uniques(frame,dropAttachements)
+        if i==0:
+            i+=1
+            outFrame=uniqueFrame
+        else:
+            outFrame = mergeUniques(outFrame,uniqueFrame)
+    PandasTools.AddMoleculeColumnToFrame(outFrame,'Smiles','Molecule',includeFingerprints=True)
+    return outFrame            
 
 def find_connected_smiles(molFrame,mol):
     #deprecated, nto used
