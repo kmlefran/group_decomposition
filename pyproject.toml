@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling","rdkit","pandas","numpy"]
+build-backend = "hatchling.build"
+[project]
+name = "fragmenting_klg"
+version = "0.0.1"
+authors = [
+    {name = "Kevin Lefrancois-Gagnon", email="kgagnon@lakeheadu.ca},
+    {name = "Robert C. Mawhinney", email="rmawhinn@lakeheadu.ca"}
+]
+description = "Tools to separate molecules into chemically meaningful fragments"
+readme = "README.md
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License"
+    "Operating System :: OS Independent"
+]
+[project.urls]
+"Homepage" = "google.ca"

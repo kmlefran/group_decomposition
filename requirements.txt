@@ -1,0 +1,7 @@
+Packages required:
+rdkit
+    conda install -c rdkit rdkit
+pandas
+    conda install -c anaconda pandas
+numpy
+    conda install -c anaconda numpy

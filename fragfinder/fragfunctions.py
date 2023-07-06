@@ -3,20 +3,7 @@ import rdkit
 import re
 from rdkit import Chem, rdBase
 from rdkit.Chem import AllChem #used for 3d coordinates
-from rdkit.Chem import Draw,rdDepictor
-from rdkit.Chem.Draw import IPythonConsole, rdMolDraw2D
 from rdkit.Chem.Scaffolds import rdScaffoldNetwork # scaffolding
-from rdkit import RDPaths
-from rdkit.Chem.Draw import rdMolDraw2D
-import math
-import matplotlib as mpl
-from matplotlib import pyplot as plt
-import os
-import pyvis
-from pyvis.network import Network
-import inspect
-from IPython import display
-from IPython.display import SVG
 import pandas as pd #lots of work with data frames
 from rdkit.Chem import PandasTools # Smiles and molecule  integration with Pandas
 from rdkit.Chem import rdqueries # search for rdScaffoldAttachment points * to remove
@@ -432,6 +419,7 @@ def copy_molecule(molecule):
 
 
 def clean_smile(trimSmi):
+    """"""
     trimSmi = trimSmi.replace('[*H]','*')
     trimSmi = trimSmi.replace('[*H3]','*')
     trimSmi = trimSmi.replace('[*H2]','*')
@@ -444,6 +432,7 @@ def clean_smile(trimSmi):
     return trimSmi
 
 def trim_molpart(molFrame,molPartList,molecule):
+    """Given molFrame, and unique parts in molFrame, and the molecule, break molecule into the unique parts."""
     #will return with connections set to count:*, not labeled
     count=1
     bonds = []
@@ -471,45 +460,83 @@ def trim_molpart(molFrame,molPartList,molecule):
 
 
 def break_molparts(molPartSmi,count):
+    """For a given list of Smiles of the molecule parts, break non-ring groups into Ertl functional groups and alkyl groups."""
     elToRM = []
     newSmi=[]
     for i,partsmi in enumerate(molPartSmi):
         molecule = Chem.MolFromSmiles(partsmi)
         if molecule.GetRingInfo().NumRings() == 0: #don't do this for rings
-            bondsToBreak = molecule.GetSubstructMatches(Chem.MolFromSmarts('[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0]):2]'))
+            bondsToBreak = molecule.GetSubstructMatches(Chem.MolFromSmarts('[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0]):2]')) #break sp3 carbon to ring/heteroatom bonds
             bonds = []
             labels = []
-            for bond in bondsToBreak:
+            for bond in bondsToBreak: #iterate over matches, storing bond index, and the dummy atom labels to be used in a list
                 b = molecule.GetBondBetweenAtoms(bond[0],bond[1])
                 bonds.append(b.GetIdx())
                 labels.append([count,count])
-                count  = count+1
+                count  = count+1 #all dummy atom labels will be different for different bond breaking
             if bonds:
                 elToRM.append(i)
                 fragMol = Chem.FragmentOnBonds(molecule,bondIndices=bonds,dummyLabels=labels)
-                splitSmiles  = Chem.MolToSmiles(fragMol).split('.')#remove molecule from fragframe, add fragments
+                splitSmiles  = Chem.MolToSmiles(fragMol).split('.')#FragmentOnBonds returns SMILES with fragments separated by ., get each fragment in its own string in a list
                 for split in splitSmiles:
-                    newSmi.append(Chem.MolToSmiles(Chem.MolFromSmiles(split)))
+                    newSmi.append(Chem.MolToSmiles(Chem.MolFromSmiles(split))) #store canonical fragment smiles in new list
     elToRM = sorted(elToRM,reverse=True)
     for el in elToRM:
-        del molPartSmi[el]
-    outSmi  = molPartSmi + newSmi
+        del molPartSmi[el] #if the molPart was broken apart, remove it from the output so each atom is uniquely assigned
+    outSmi  = molPartSmi + newSmi #this is the Smiles of all fragments in the molecule
     return outSmi        
 
 
 
 
 def identify_connected_fragments(smile: str):
+    """
+    Given Smiles string, identify fragments in the molecule as follows:
+    Break all ring-non-ring atom single bonds
+    Store the resulting fragments
+    For non-ring fragments, separate those into alkyl chains and hetero/double bonded atoms (similar to Ertl functional groups)
+    Each bond breaking, connectivity is maintained through dummy atom labels.
+    e.g. C-N -> C-[1*] N-[1*] - reattaching via the matching labels would reassemble the molecule
+    
+    Args:
+        smile: a string containing smiles for a given molecule, does not need to be canonical
+    Returns:
+        pandas data frame with columms 'Smiles', 'Molecule', 'numAttachments' and 'xyz'
+        Containing, fragment smiles, fragment Chem.Molecule object, number of * placeholders, and rough xyz coordinates for the fragment is * were At
+    Notes: currently will break apart a functional group if contains a ring-non-ring single bond. e.g. ring N-nonring S=O -> ring N-[1*] nonring S=O-[1*]    
+    """
+    #ensure smiles is canonical so writing and reading the smiles will result in same number ordering of atoms
     mol = get_canonical_molecule(smile)
+    #assign molecule into parts (Rings, side chains, peripherals)
     molFrame = generate_full_molFrame(mol)
+    #break molecule into fragments defined by the unique parts in molFrame (Ring 1, Peripheral 1, Linker 1, Linker 2, etc.)
     fragmentSmiles = trim_molpart(molFrame,molFrame['molPart'].unique(),mol)
+    #break side chains and linkers into Ertl functional groups and alkyl chains
     fullSmi = break_molparts(fragmentSmiles['smiles'],fragmentSmiles['count'])
+    #initialize the output data frame
     fragFrame = generate_fragment_frame(fullSmi)
+    #add hydrogens and xyz coordinates resulting from MMFF94 opt, changing placeholders to At
     fragFrame = add_xyz_coords(fragFrame)
+    #count number of placeholders in each fragment - it is the number of places it is attached
     fragFrame = add_number_attachements(fragFrame)
     return fragFrame
 
 def count_uniques(fragFrame,dropAttachements=False):
+    """
+    Given fragframe resulting from identify_connected_fragments, remove dummy atom labels(and placeholders entirely if dropAttachments=True)
+    Then, compare the Smiles to count the unique fragments, and return a version of fragFrame that only includes unique fragments
+    and the number of times each unique fragment occurs.
+
+    Args:
+        fragFrame: frame resulting from identify_connected_fragments typically, or any similar frame with a list of SMILES codes in column ['Smiles']
+        dropAttachments: boolean, if False, retains placeholder * at points of attachment, if True, removes * for fragments with more than one atom
+
+    Returns:
+        pandas data frame with columns 'Smiles', 'count' and 'Molecule', containing the Smiles string, the number of times the Smiles was in fragFrame, and rdkit.Chem.Molecule object    
+
+    Notes: if dropAttachments=False, similar fragments with different number/positions of attachments will not count as being the same.
+    e.g. ortho-attached aromatics would not match with meta or para attached aromatics        
+    """
     smileList = fragFrame['Smiles']
     noConnectSmile=[]
     for smile in smileList:
@@ -543,6 +570,37 @@ def count_uniques(fragFrame,dropAttachements=False):
     return uniqueFragFrame
 
 def mergeUniques(frame1,frame2):
+    """Given two frames of unique fragments, identify shared unique fragments, merge count and frames together.
+    
+    Args:
+        frame1: a frame output from count_uniques
+        frame2: a distinct frame also from count_uniques
+
+    Returns:
+        a frame resulting from the merge of frame1 and frame2. All rows that have Smiles that are in frame1 but not frame2(and vice versa) are included unmodified
+        If a row's SMILES is in both frame1 and frame2, modify the row to update the count of that fragment as sum of frame1 and frame2, then include one row.
+
+    Note:
+        for best results, SMILES must be canonical so that they can be exactly compared.
+        Smiles in frame should be resulting from Chem.MolToSmiles(Chem.MolFromSmiles(smile)) - this will create a molecule from the smile, and write the smile back, in canonical form    
+
+    Example usage:
+        frame1:
+        Smiles  count
+        C       2
+        C1CCC1  1
+
+        frame2:
+        Smiles  count
+        C       3
+        C1CC1   2
+
+        mergeUniques(frame1,frame2) returns
+        Smiles  count
+        C       5
+        C1CCC1  1
+        C1CC1   2
+    """
     madeFrame=0
     rowsToDropOne = []
     rowsToDropTwo = []
@@ -581,7 +639,18 @@ def mergeUniques(frame1,frame2):
             mergeFrame.loc[len(mergeFrame)] = [smi, list(dropframe2['count'])[i]]           
     return mergeFrame
 
-def count_groups_in_set(listOfSmiles,dropAttachements):
+def count_groups_in_set(listOfSmiles,dropAttachements=False):
+    """Identify unique fragments in molecules defined in the listOfSmiles, and count the number of occurences for duplicates.
+    Args:
+        listOfSmiles: A list, with each element being a SMILES string, e.g. ['CC','C1CCCC1']
+        dropAttachments: Boolean for whether or not to drop attachment points from fragments
+            if True, will remove all placeholder atoms indicating connectivity
+            if False, placeholder atoms will remain
+    Returns:
+        an output pd.DataFrame, with columns 'Smiles' for fragment Smiles, 'count' for number of times each fragment occurs in the list, and 'Molecule' holding a rdkit.Chem.Molecule object
+        
+    Example usage:
+        count_groups_in_set(['c1ccc(c(c1)c2ccc(o2)C(=O)N3C[C@H](C4(C3)CC[NH2+]CC4)C(=O)NCCOCCO)F','Cc1nc2ccc(cc2s1)NC(=O)c3cc(ccc3N4CCCC4)S(=O)(=O)N5CCOCC5'],dropAttachements=False)."""
     i=0
     for smile in listOfSmiles:
         frame = identify_connected_fragments(smile)
