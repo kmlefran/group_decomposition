@@ -1,0 +1,14 @@
+LICENSE
+README.md
+setup.py
+group_decomposition/__init__.py
+group_decomposition/fragfunctions.py
+group_decomposition/ifg.py
+group_decomposition/utils.py
+group_decomposition.egg-info/PKG-INFO
+group_decomposition.egg-info/SOURCES.txt
+group_decomposition.egg-info/dependency_links.txt
+group_decomposition.egg-info/not-zip-safe
+group_decomposition.egg-info/requires.txt
+group_decomposition.egg-info/top_level.txt
+tests/test_fragment.py
