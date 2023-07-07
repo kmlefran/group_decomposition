@@ -1,7 +1,7 @@
 import sys
 sys.path.append("/Users/chemlab/Documents/Retrievium Work/Scaffolding/Coding Workspace/scripts")
-import src
-from src import identify_connected_fragments, count_uniques
+import group_decomposition
+from group_decomposition import identify_connected_fragments, count_uniques
 import rdkit
 import unittest
 

@@ -9,8 +9,8 @@ import pandas as pd #lots of work with data frames
 from rdkit.Chem import PandasTools # Smiles and molecule  integration with Pandas
 from rdkit.Chem import rdqueries # search for rdScaffoldAttachment points * to remove
 import numpy as np #for arrays in fragment identification
-from src import ifg
-from utils import utils
+from group_decomposition import ifg
+from group_decomposition import utils
 
 def eliminate_nonring_atoms(nodemolecules):
     """given list of molecules of utils.get_scaffold_vertices output, removes molecules that contain atoms that are not in ring or not double bonded to ring."""
