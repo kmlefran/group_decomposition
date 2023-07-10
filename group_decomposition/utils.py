@@ -1,3 +1,9 @@
+"""
+utils.py
+
+Various utilities used in fragmenting molecules - retrieving information from molecules
+Identifying small parts of molecules, and tools for minor manipulations of SMILES or molecules
+"""
 import sys
 sys.path.append(sys.path[0].replace('/src',''))
 import rdkit
@@ -28,7 +34,7 @@ def set_scaffold_params():
     scafnet_params.includeScaffoldsWithoutAttachments = False
     #don't include scaffolds without atom labels
     scafnet_params.includeGenericScaffolds = False
-    #keep all generated fragments - some were discarded messing with code if True 
+    #keep all generated fragments - some were discarded messing with code if True
     scafnet_params.keepOnlyFirstFragment = False
     return scafnet_params
 
@@ -37,7 +43,7 @@ def get_molecules_atomicnum(molecule):
     atom_num_list = []
     for atom in molecule.GetAtoms():
         atom_num_list.append(atom.GetAtomicNum())
-    return atom_num_list    
+    return atom_num_list
 
 def get_molecules_atomsinrings(molecule):
     """Given molecule object, get Boolean list of if atoms are in a ring."""
@@ -56,7 +62,7 @@ def trim_placeholders(rwmol):
             rm_at_idx.append(atom.GetIdx())
              #remove starting from highest number so upcoming indices not affected
         rm_at_idx_sort = sorted(rm_at_idx,reverse=True)
-        #e.g. need to remove 3 and 5, if don't do this and you remove 3, 
+        #e.g. need to remove 3 and 5, if don't do this and you remove 3,
         # then the 5 you want to remove is now 4, and you'll remove wrong atom
         for idx in rm_at_idx_sort: #remove atoms
             rwmol.RemoveAtom(idx)
@@ -65,10 +71,10 @@ def trim_placeholders(rwmol):
 def get_canonical_molecule(smile: str):
     """Ensures that molecule numbering is consistent with creating molecule from canonical 
     SMILES for consistency."""
-    mol = Chem.MolFromSmiles(smile) 
+    mol = Chem.MolFromSmiles(smile)
     mol_smi = Chem.MolToSmiles(mol) #molsmi is canonical SMILES
     #create canonical molecule numbering from canonical SMILES
-    return Chem.MolFromSmiles(mol_smi) 
+    return Chem.MolFromSmiles(mol_smi)
 
 def copy_molecule(molecule):
     """create a copy of molecule object in new object(not pointer)"""
@@ -80,10 +86,10 @@ def clean_smile(trim_smi):
     trim_smi = trim_smi.replace('[*H]','*')
     trim_smi = trim_smi.replace('[*H3]','*')
     trim_smi = trim_smi.replace('[*H2]','*')
-    trim_smi = trim_smi.replace('[*H+]','*')  
+    trim_smi = trim_smi.replace('[*H+]','*')
     trim_smi = trim_smi.replace('[*H3+]','*')
     trim_smi = trim_smi.replace('[*H2+]','*')
-    trim_smi = trim_smi.replace('[*H-]','*')  
+    trim_smi = trim_smi.replace('[*H-]','*')
     trim_smi = trim_smi.replace('[*H3-]','*')
     trim_smi = trim_smi.replace('[*H2-]','*')
     return trim_smi
@@ -115,7 +121,7 @@ def eliminate_nonring_atoms(nodemolecules):
         for idx,atom in enumerate(frag_mol.GetAtoms()):
             non_ring_double=0
             #if atom is not in ring, check if it is double bonded to a ring
-            if not atom.IsInRing(): 
+            if not atom.IsInRing():
                 for neigh in atom.GetNeighbors():
                     bond_type = frag_mol.GetBondBetweenAtoms(idx,neigh.GetIdx()).Getbond_type()
                     #print(bond_type)
@@ -123,13 +129,13 @@ def eliminate_nonring_atoms(nodemolecules):
                     if  n_in_r and bond_type ==Chem.rdchem.bond_type.DOUBLE:
                         print('I passed the if')
                         non_ring_double=1
-            #if not attachment (atomic number 0 used as attachments by rdScaffoldNetwork)            
-            if atom.GetAtomicNum() != 0: 
+            #if not attachment (atomic number 0 used as attachments by rdScaffoldNetwork)
+            if atom.GetAtomicNum() != 0:
                 if not atom.IsInRing(): #if atom is not in ring
                     if non_ring_double==0: #if atom is not double bonded to ring
                         flag=0 #all the above true, don't remove molecule from output
                         #will remove from output if a single atom in the node fails the tests
-                        break 
+                        break
         if flag == 1: #if pass all tests for all atoms, add to list to be returned
             first_parse.append(frag_mol)
     return first_parse
