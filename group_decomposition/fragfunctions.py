@@ -516,7 +516,7 @@ def identify_connected_fragments(smile: str):
     #initialize the output data frame
     frag_frame = generate_fragment_frame(full_smi)
     #add hydrogens and xyz coordinates resulting from MMFF94 opt, changing placeholders to At
-    frag_frame = add_xyz_coords(frag_frame)
+    # frag_frame = add_xyz_coords(frag_frame)
     #count number of placeholders in each fragment - it is the number of places it is attached
     frag_frame = add_number_attachements(frag_frame)
     return frag_frame
@@ -582,6 +582,8 @@ def count_uniques(frag_frame,drop_attachments=False):
     PandasTools.AddMoleculeColumnToFrame(uniquefrag_frame,'Smiles','Molecule',
                                          includeFingerprints=True)
     uniquefrag_frame['count']=unique_smiles_counts
+    uniquefrag_frame = add_xyz_coords(uniquefrag_frame)
+    uniquefrag_frame = add_number_attachements(uniquefrag_frame)
     return uniquefrag_frame
 
 def merge_uniques(frame1,frame2):
@@ -680,4 +682,6 @@ def count_groups_in_set(list_of_smiles,drop_attachments=False):
         else:
             out_frame = merge_uniques(out_frame,unique_frame)
     PandasTools.AddMoleculeColumnToFrame(out_frame,'Smiles','Molecule',includeFingerprints=True)
+    #out_frame = add_xyz_coords(out_frame)
+    out_frame = add_number_attachements(out_frame)
     return out_frame
