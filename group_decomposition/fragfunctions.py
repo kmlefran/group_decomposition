@@ -20,39 +20,41 @@ sys.path.append(sys.path[0].replace('/src',''))
 from group_decomposition import ifg
 from group_decomposition import utils
 
-def eliminate_nonring_atoms(nodemolecules):
-    """given list of molecules of utils.get_scaffold_vertices output, 
-    removes molecules that contain
-      atoms that are not in ring or not double bonded to ring."""
-    first_parse = []
-    for frag_mol in nodemolecules:
-        flag=1
-        for idx,atom in enumerate(frag_mol.GetAtoms()):
-            non_ring_double=0
-            #if atom is not in ring, check if it is double bonded to a ring
-            if not atom.IsInRing():
-                for neigh in atom.GetNeighbors():
-                    bond_type = frag_mol.GetBondBetweenAtoms(idx,neigh.GetIdx()).GetBondType()
-                    #print(bondType)
-                    nir = frag_mol.GetAtomWithIdx(neigh.GetIdx()).IsInRing()
-                    if  nir and bond_type ==Chem.rdchem.BondType.DOUBLE:
-                        print('I passed the if')
-                        non_ring_double=1
-            #if not attachment (atomic number 0 used as attachments by rdScaffoldNetwork)
-            if atom.GetAtomicNum() != 0:
-                if not atom.IsInRing(): #if atom is not in ring
-                    if non_ring_double==0: #if atom is not double bonded to ring
-                        flag=0 #all the above true, don't remove molecule from output
-                        #will remove from output if a single atom in the node fails the tests
-                        break
-        if flag == 1: #if pass all tests for all atoms, add to list to be returned
-            first_parse.append(frag_mol)
-    return first_parse
+# def eliminate_nonring_atoms(nodemolecules):
+#     """given list of molecules of utils.get_scaffold_vertices output, 
+#     removes molecules that contain
+#       atoms that are not in ring or not double bonded to ring."""
+#     first_parse = []
+#     for frag_mol in nodemolecules:
+#         flag=1
+#         for idx,atom in enumerate(frag_mol.GetAtoms()):
+#             non_ring_double=0
+#             #if atom is not in ring, check if it is double bonded to a ring
+#             if not atom.IsInRing():
+#                 for neigh in atom.GetNeighbors():
+#                     bond_type = frag_mol.GetBondBetweenAtoms(idx,neigh.GetIdx()).GetBondType()
+#                     #print(bondType)
+#                     nir = frag_mol.GetAtomWithIdx(neigh.GetIdx()).IsInRing()
+#                     if  nir and bond_type ==Chem.rdchem.BondType.DOUBLE:
+#                         print('I passed the if')
+#                         non_ring_double=1
+#             #if not attachment (atomic number 0 used as attachments by rdScaffoldNetwork)
+#             if atom.GetAtomicNum() != 0:
+#                 if not atom.IsInRing(): #if atom is not in ring
+#                     if non_ring_double==0: #if atom is not double bonded to ring
+#                         flag=0 #all the above true, don't remove molecule from output
+#                         #will remove from output if a single atom in the node fails the tests
+#                         break
+#         if flag == 1: #if pass all tests for all atoms, add to list to be returned
+#             first_parse.append(frag_mol)
+#     return first_parse
 
 
-def initialize_molecule_frame(molecule):
-    """Given a molecule, create an initial data frame for identifying 
-    main parts of molecule (Rings/side chains/linkers)"""
+def _initialize_molecule_frame(molecule):
+    """Given a molecule, assign create frame with atomic numbers, Boolean of if in ring
+    and unknown column
+
+    """
     atomic_numbers = utils.get_molecules_atomicnum(molecule)
     atoms_in_rings = utils.get_molecules_atomsinrings(molecule)
     initialization_data = {'atomNum': atomic_numbers,
@@ -61,7 +63,7 @@ def initialize_molecule_frame(molecule):
     return pd.DataFrame(initialization_data)
 
 
-def identify_ring_atom_index(molecule,ring_frags):
+def _identify_ring_atom_index(molecule,ring_frags):
     """Given molecules and list of rings(from utils.find_smallest_rings), return list of lists of
     indices of the ring atoms. Each element in list is a ring, each element in that list is the
     index of an atom in ring."""
@@ -74,8 +76,8 @@ def identify_ring_atom_index(molecule,ring_frags):
             list_of_rings.append(match)
     return list_of_rings
 
-def remove_subset_rings(indices):
-    """Given identify_ring_atom_index, remove lists from the index that are 
+def _remove_subset_rings(indices):
+    """Given _identify_ring_atom_index, remove lists from the index that are 
     subset of the other lists."""
     #For example, if a molecule had a phenyl ring and napthalene ring scaffolds,
     # the phenyl would also show up as a structure match for the napthalene.
@@ -94,7 +96,7 @@ def remove_subset_rings(indices):
             unique_not_subset_list.append(ring_id)
     return unique_not_subset_list
 
-def assign_rings_to_mol_frame(indices,mol_frame):
+def _assign_rings_to_mol_frame(indices,mol_frame):
     """Given list of indices, update mol_frame so that the atoms are assigned to rings."""
     ring_count = 1 #parts are labeled Ring 1, Ring 2 .... Ring R
     for ring_id in indices:
@@ -103,8 +105,8 @@ def assign_rings_to_mol_frame(indices,mol_frame):
         ring_count += 1 #next ring is Ring 2
     return mol_frame
 
-def set_double_bonded_in_ring(mol_frame):
-    """Given mol_frame updated by assign_rings_to_mol_frame, and the parent molecule, 
+def _set_double_bonded_in_ring(mol_frame):
+    """Given mol_frame updated by _assign_rings_to_mol_frame, and the parent molecule, 
     ensure that atoms double bonded to the ring are counted as inRing in the Boolean column."""
     # inRing = utils.get_molecules_atomsinrings(molecule)
     # notinring = []
@@ -120,7 +122,7 @@ def set_double_bonded_in_ring(mol_frame):
     mol_frame.loc[idx_to_update,['inRing']] = True #update the needed atoms to
     return mol_frame
 
-def find_in_ring_and_not(molecule):
+def _find_in_ring_and_not(molecule):
     """given molecule, return np array of atoms in rings and not in rings"""
     in_ring_bool = utils.get_molecules_atomsinrings(molecule)
     not_in_ring = []
@@ -135,10 +137,10 @@ def find_in_ring_and_not(molecule):
     return {'in_ring':in_ring_py, 'not_in_ring':check_atoms}
 
 
-def assign_side_and_linkers(mol_frame,molecule):
+def _assign_side_and_linkers(mol_frame,molecule):
     """Given a mol_frame updated with Rings and the parent molecule, 
     assign the remaining atoms to side chains or linkers."""
-    ring_assign = find_in_ring_and_not(molecule)
+    ring_assign = _find_in_ring_and_not(molecule)
     in_ring_py = ring_assign['in_ring']
     in_ring = in_ring_py.tolist()
     check_atoms = ring_assign['not_in_ring']
@@ -149,7 +151,7 @@ def assign_side_and_linkers(mol_frame,molecule):
     periph_count=1 #see line above, but for side chains
     while check_atoms.size > 0: #while there are atoms left to check
         #initialize atoms in this group, starting with the first atom
-        grp = find_group(check_atoms,molecule,not_in_ring,in_ring_py)
+        grp = _find_group(check_atoms,molecule,not_in_ring,in_ring_py)
         check_atoms=check_atoms[~np.isin(check_atoms,grp)] #remove atoms in grp from checkAtoms
         #at this point, we are done iterating over the set of connected atoms comprising the l
         # linker/peripheral
@@ -157,7 +159,7 @@ def assign_side_and_linkers(mol_frame,molecule):
         # generate its connectivity and group, remove those etc.
         #counter number of atoms in the group that are bonded to rings,
         # if ==1, it is side chain, if ==2, it is linker
-        at_ring = count_rings_at_to_grp(grp,molecule,in_ring)
+        at_ring = _count_rings_at_to_grp(grp,molecule,in_ring)
         if at_ring == 1:
             fg_type.append("Peripheral {count}".format(count=periph_count))
             periph_count+=1
@@ -165,10 +167,10 @@ def assign_side_and_linkers(mol_frame,molecule):
             fg_type.append('Linker {count}'.format(count = linker_count))
             linker_count+=1
         fgs.append(list(grp))
-    mol_frame = assign_groups_to_frame(mol_frame,fgs,fg_type)
+    mol_frame = _assign_groups_to_frame(mol_frame,fgs,fg_type)
     return mol_frame
 
-def assign_groups_to_frame(mol_frame,fgs,fg_type):
+def _assign_groups_to_frame(mol_frame,fgs,fg_type):
     """given mol_frame and list of fg, assign the groups to mol_frame"""
     i=0
     while i < len(fgs): #update mol_frame with group parts
@@ -178,7 +180,7 @@ def assign_groups_to_frame(mol_frame,fgs,fg_type):
         i+=1
     return mol_frame
 
-def find_neighbors(atom):
+def _find_neighbors(atom):
     """given atom object a, find neighbours and return array of neighbour indices."""
     a_neigh = atom.GetNeighbors()
     #get the indices of the neighbours of ay in np array
@@ -187,11 +189,11 @@ def find_neighbors(atom):
         a_neigh_num.append(n_at.GetIdx())
     return np.array(a_neigh_num)
 
-def find_group(check_atoms, molecule, not_in_ring,in_ring_py):
+def _find_group(check_atoms, molecule, not_in_ring,in_ring_py):
     """Find a group of connected atoms."""
     grp = np.array([check_atoms[0]])
     #atom a is the first atom remaining in checkAtoms by index
-    a_neigh_numpy = find_neighbors(molecule.GetAtomWithIdx(int(check_atoms[0])))
+    a_neigh_numpy = _find_neighbors(molecule.GetAtomWithIdx(int(check_atoms[0])))
     #Initialize newNeighbours to True, will be set to false in loop if an iteration
     # fails to look at an atom we ahve already seen
     new_neighbors=True
@@ -206,7 +208,7 @@ def find_group(check_atoms, molecule, not_in_ring,in_ring_py):
                     #if neighbour n is not in a ring, and not yet added to the group,
                     # add it to the group
                     grp = np.append(grp,n_at)
-                n_neigh_numpy = find_neighbors(n_at)
+                n_neigh_numpy = _find_neighbors(n_at)
                 #neighbours not in ring
                 n_neigh_numpy = np.setdiff1d(n_neigh_numpy,in_ring_py)
                 #not in ring and not in neighbours of a
@@ -224,7 +226,7 @@ def find_group(check_atoms, molecule, not_in_ring,in_ring_py):
                 grp = np.append(grp,not_in_gr)
     return grp
 
-def count_rings_at_to_grp(group,molecule,in_ring):
+def _count_rings_at_to_grp(group,molecule,in_ring):
     """Return number of rings connected to a group in molecule."""
     at_ring=0
     for idx in group:
@@ -234,7 +236,7 @@ def count_rings_at_to_grp(group,molecule,in_ring):
                 at_ring+=1
     return at_ring
 
-def generate_part_smiles(mol_frame,molecule):
+def _generate_part_smiles(mol_frame,molecule):
     """Given complete mol_frame and molecule, generate SMILES for each 
     part(Ring/linker/peripheral), return as list."""
     fragments = mol_frame['molPart'].unique()
@@ -267,7 +269,7 @@ def generate_part_smiles(mol_frame,molecule):
         frag_smi.append(out_smi)
     return frag_smi
 
-def find_alkyl_groups(mol_frame,frag_smi,molecule):
+def _find_alkyl_groups(mol_frame,frag_smi,molecule):
     """Given mol_frame(complete), list of molecule parts as SMILES, and a molecule object, 
     add all continuous alkyl groups to list of SMILES."""
     fragments = mol_frame['molPart'].unique()
@@ -387,12 +389,12 @@ def generate_full_mol_frame(mol1):
     """Generate data frame for molecule assigning all atoms to rings/linkers/peripherals."""
     mol1nodemols = utils.get_scaffold_vertices(mol1)
     ring_frags = utils.find_smallest_rings(mol1nodemols)
-    mol_frame = initialize_molecule_frame(mol1)
-    ring_atom_indices = identify_ring_atom_index(mol1,ring_frags)
-    ring_indices_nosubset = remove_subset_rings(ring_atom_indices)
-    mol_frame = assign_rings_to_mol_frame(ring_indices_nosubset,mol_frame)
-    mol_frame = set_double_bonded_in_ring(mol_frame)
-    mol_frame = assign_side_and_linkers(mol_frame,mol1)
+    mol_frame = _initialize_molecule_frame(mol1)
+    ring_atom_indices = _identify_ring_atom_index(mol1,ring_frags)
+    ring_indices_nosubset = _remove_subset_rings(ring_atom_indices)
+    mol_frame = _assign_rings_to_mol_frame(ring_indices_nosubset,mol_frame)
+    mol_frame = _set_double_bonded_in_ring(mol_frame)
+    mol_frame = _assign_side_and_linkers(mol_frame,mol1)
     return mol_frame
 
 
@@ -406,8 +408,8 @@ def identify_fragments(smile: str):
     mol = utils.get_canonical_molecule(smile)
     mol_frame = generate_full_mol_frame(mol)
     #print(mol_frame)
-    frag_smi = generate_part_smiles(mol_frame,molecule=mol)
-    frag_smi = find_alkyl_groups(mol_frame,frag_smi,mol)
+    frag_smi = _generate_part_smiles(mol_frame,molecule=mol)
+    frag_smi = _find_alkyl_groups(mol_frame,frag_smi,mol)
     #print(fragSmi)
     frag_frame = generate_fragment_frame(frag_smi)
     frag_frame = add_ertl_functional_groups(frag_frame)
@@ -417,7 +419,7 @@ def identify_fragments(smile: str):
     return frag_frame
 
 
-def trim_molpart(mol_frame,mol_part_lst,molecule):
+def _trim_molpart(mol_frame,mol_part_lst,molecule):
     """Given mol_frame, and unique parts in mol_frame, and the molecule, 
     break molecule into the unique parts."""
     #will return with connections set to count:*, not labeled
@@ -445,7 +447,7 @@ def trim_molpart(mol_frame,mol_part_lst,molecule):
     return {'smiles':new_smi, 'count':count}
 
 
-def break_molparts(mol_part_smi,count):
+def _break_molparts(mol_part_smi,count):
     """For a given list of Smiles of the molecule parts, break non-ring groups into 
     Ertl functional groups and alkyl groups."""
     el_to_rm = []
@@ -510,9 +512,9 @@ def identify_connected_fragments(smile: str):
     mol_frame = generate_full_mol_frame(mol)
     #break molecule into fragments defined by the unique parts in mol_frame (Ring 1, Peripheral 1,
     #  Linker 1, Linker 2, etc.)
-    fragment_smiles = trim_molpart(mol_frame,mol_frame['molPart'].unique(),mol)
+    fragment_smiles = _trim_molpart(mol_frame,mol_frame['molPart'].unique(),mol)
     #break side chains and linkers into Ertl functional groups and alkyl chains
-    full_smi = break_molparts(fragment_smiles['smiles'],fragment_smiles['count'])
+    full_smi = _break_molparts(fragment_smiles['smiles'],fragment_smiles['count'])
     #initialize the output data frame
     frag_frame = generate_fragment_frame(full_smi)
     #add hydrogens and xyz coordinates resulting from MMFF94 opt, changing placeholders to At
