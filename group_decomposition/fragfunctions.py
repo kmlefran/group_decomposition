@@ -306,7 +306,7 @@ def _find_alkyl_groups(mol_frame,frag_smi,molecule):
             frag_smi.append(Chem.MolToSmiles(node))
     return frag_smi
 
-def generate_fragment_frame(fragment_smiles):
+def _generate_fragment_frame(fragment_smiles):
     """Given list of SMILES Generate output frame with SMILES codes and molecules for unique 
     fragments."""
     frag_frame = pd.DataFrame(set(fragment_smiles),columns=['Smiles'])
@@ -314,7 +314,7 @@ def generate_fragment_frame(fragment_smiles):
     frag_frame.drop(frag_frame.index[frag_frame['Smiles'] == "*"].tolist())
     return frag_frame
 
-def add_ertl_functional_groups(frag_frame):
+def _add_ertl_functional_groups(frag_frame):
     """For each SMILES in frag_frame, identify heavy/double bonded atom functional groups and
     update the frame with them."""
     for molecule in frag_frame['Molecule']:
@@ -327,10 +327,10 @@ def add_ertl_functional_groups(frag_frame):
                         print("Skipping")
                         print(fg_i)
                     else:
-                        frag_frame = find_ertl_functional_group(fg_i,frag_frame)
+                        frag_frame = _find_ertl_functional_group(fg_i,frag_frame)
     return frag_frame
 
-def find_ertl_functional_group(fg_i,frag_frame):
+def _find_ertl_functional_group(fg_i,frag_frame):
     """generate smiles and molecule object for ertl functional group."""
     #generate molecule of functional group
     just_grp = Chem.MolFromSmarts(fg_i.atoms)
@@ -356,7 +356,7 @@ def find_ertl_functional_group(fg_i,frag_frame):
                     frag_frame.loc[len(frag_frame)] = [fg_smile, fg_mol]
     return frag_frame
 
-def add_xyz_coords(frag_frame):
+def _add_xyz_coords(frag_frame):
     """Given frag_frame with molecules, add xyz coordinates form MM94 optimization to it."""
     xyz_block_list = []
     query = rdqueries.AtomNumEqualsQueryAtom(0)
@@ -372,7 +372,7 @@ def add_xyz_coords(frag_frame):
     frag_frame['xyz'] = xyz_block_list
     return frag_frame
 
-def add_number_attachements(frag_frame):
+def _add_number_attachements(frag_frame):
     """Add number of attachments column to frag_frame, counting number of *."""
     attach_list = []
     for molecule in frag_frame['Molecule']:
@@ -385,7 +385,7 @@ def add_number_attachements(frag_frame):
     frag_frame['numAttachments'] = attach_list
     return frag_frame
 
-def generate_full_mol_frame(mol1):
+def generate_full_mol_frame(mol1) -> pd.DataFrame:
     """Generate data frame for molecule assigning all atoms to rings/linkers/peripherals."""
     mol1nodemols = utils.get_scaffold_vertices(mol1)
     ring_frags = utils.find_smallest_rings(mol1nodemols)
@@ -398,7 +398,7 @@ def generate_full_mol_frame(mol1):
     return mol_frame
 
 
-def identify_fragments(smile: str):
+def identify_fragments(smile: str) -> pd.DataFrame:
     """Perform the full fragmentation.
     This will break down molecule into unique rings, linkers, functional groups, peripherals, 
     but not maintain connectivity.
@@ -411,10 +411,10 @@ def identify_fragments(smile: str):
     frag_smi = _generate_part_smiles(mol_frame,molecule=mol)
     frag_smi = _find_alkyl_groups(mol_frame,frag_smi,mol)
     #print(fragSmi)
-    frag_frame = generate_fragment_frame(frag_smi)
-    frag_frame = add_ertl_functional_groups(frag_frame)
-    frag_frame = add_xyz_coords(frag_frame)
-    frag_frame = add_number_attachements(frag_frame)
+    frag_frame = _generate_fragment_frame(frag_smi)
+    frag_frame = _add_ertl_functional_groups(frag_frame)
+    frag_frame = _add_xyz_coords(frag_frame)
+    frag_frame = _add_number_attachements(frag_frame)
     #print(frag_frame)
     return frag_frame
 
@@ -447,7 +447,7 @@ def _trim_molpart(mol_frame,mol_part_lst,molecule):
     return {'smiles':new_smi, 'count':count}
 
 
-def _break_molparts(mol_part_smi,count):
+def _break_molparts(mol_part_smi,count,drop_parent = True):
     """For a given list of Smiles of the molecule parts, break non-ring groups into 
     Ertl functional groups and alkyl groups."""
     el_to_rm = []
@@ -456,7 +456,7 @@ def _break_molparts(mol_part_smi,count):
         molecule = Chem.MolFromSmiles(partsmi)
         if molecule.GetRingInfo().NumRings() == 0: #don't do this for rings
             #break sp3 carbon to ring/heteroatom bonds
-            patt='[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0]):2]'
+            patt='[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35]):2]'
             bonds_to_break = molecule.GetSubstructMatches(Chem.MolFromSmarts(patt))
             bonds = []
             labels = []
@@ -477,16 +477,17 @@ def _break_molparts(mol_part_smi,count):
                 for split in split_smiles:
                     #store canonical fragment smiles in new list
                     new_smi.append(Chem.MolToSmiles(Chem.MolFromSmiles(split)))
-    el_to_rm = sorted(el_to_rm,reverse=True)
-    for rm_el in el_to_rm:
-        #if the molPart was broken apart, remove it from the output
-        # so each atom is uniquely assigned
-        del mol_part_smi[rm_el]
+    if drop_parent:
+        el_to_rm = sorted(el_to_rm,reverse=True)
+        for rm_el in el_to_rm:
+            #if the molPart was broken apart, remove it from the output
+            # so each atom is uniquely assigned
+            del mol_part_smi[rm_el]
     out_smi  = mol_part_smi + new_smi #this is the Smiles of all fragments in the molecule
     return out_smi
 
 
-def identify_connected_fragments(smile: str):
+def identify_connected_fragments(smile: str,keep_only_children=True) -> pd.DataFrame:
     """
     Given Smiles string, identify fragments in the molecule as follows:
     Break all ring-non-ring atom single bonds
@@ -498,6 +499,8 @@ def identify_connected_fragments(smile: str):
     
     Args:
         smile: a string containing smiles for a given molecule, does not need to be canonical
+        keep_only_children: boolean, if True, when a group is broken down into its components
+            remove the parent group from output. If False, parent group is retained
     Returns:
         pandas data frame with columms 'Smiles', 'Molecule', 'numAttachments' and 'xyz'
         Containing, fragment smiles, fragment Chem.Molecule object, number of * placeholders,
@@ -514,16 +517,17 @@ def identify_connected_fragments(smile: str):
     #  Linker 1, Linker 2, etc.)
     fragment_smiles = _trim_molpart(mol_frame,mol_frame['molPart'].unique(),mol)
     #break side chains and linkers into Ertl functional groups and alkyl chains
-    full_smi = _break_molparts(fragment_smiles['smiles'],fragment_smiles['count'])
+    full_smi = _break_molparts(fragment_smiles['smiles'],fragment_smiles['count']
+                               ,drop_parent=keep_only_children)
     #initialize the output data frame
-    frag_frame = generate_fragment_frame(full_smi)
+    frag_frame = _generate_fragment_frame(full_smi)
     #add hydrogens and xyz coordinates resulting from MMFF94 opt, changing placeholders to At
-    # frag_frame = add_xyz_coords(frag_frame)
+    # frag_frame = _add_xyz_coords(frag_frame)
     #count number of placeholders in each fragment - it is the number of places it is attached
-    frag_frame = add_number_attachements(frag_frame)
+    frag_frame = _add_number_attachements(frag_frame)
     return frag_frame
 
-def count_uniques(frag_frame,drop_attachments=False):
+def count_uniques(frag_frame:pd.DataFrame,drop_attachments=False) -> pd.DataFrame:
     """
     Given frag_frame resulting from identify_connected_fragments, remove dummy atom labels
     (and placeholders entirely if drop_attachments=True)
@@ -584,11 +588,11 @@ def count_uniques(frag_frame,drop_attachments=False):
     PandasTools.AddMoleculeColumnToFrame(uniquefrag_frame,'Smiles','Molecule',
                                          includeFingerprints=True)
     uniquefrag_frame['count']=unique_smiles_counts
-    uniquefrag_frame = add_xyz_coords(uniquefrag_frame)
-    uniquefrag_frame = add_number_attachements(uniquefrag_frame)
+    uniquefrag_frame = _add_xyz_coords(uniquefrag_frame)
+    uniquefrag_frame = _add_number_attachements(uniquefrag_frame)
     return uniquefrag_frame
 
-def merge_uniques(frame1,frame2):
+def merge_uniques(frame1:pd.DataFrame,frame2:pd.DataFrame) -> pd.DataFrame:
     """Given two frames of unique fragments, identify shared unique fragments,
     merge count and frames together.
     
@@ -658,7 +662,7 @@ def merge_uniques(frame1,frame2):
     return merge_frame
 
 
-def count_groups_in_set(list_of_smiles,drop_attachments=False):
+def count_groups_in_set(list_of_smiles:list[str],drop_attachments:bool=False) -> pd.DataFrame:
     """Identify unique fragments in molecules defined in the list_of_smiles, 
     and count the number of occurences for duplicates.
     Args:
@@ -684,6 +688,6 @@ def count_groups_in_set(list_of_smiles,drop_attachments=False):
         else:
             out_frame = merge_uniques(out_frame,unique_frame)
     PandasTools.AddMoleculeColumnToFrame(out_frame,'Smiles','Molecule',includeFingerprints=True)
-    #out_frame = add_xyz_coords(out_frame)
-    out_frame = add_number_attachements(out_frame)
+    #out_frame = _add_xyz_coords(out_frame)
+    out_frame = _add_number_attachements(out_frame)
     return out_frame
