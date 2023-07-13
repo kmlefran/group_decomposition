@@ -1,8 +1,0 @@
-Metadata-Version: 2.1
-Name: group-decomposition
-Version: 0.0.1
-Summary: Extract fragments and counts of fragments from molecule SMILES codes
-Home-page: https://github.com/kmlefran/group_decomposition
-Author: Kevin M. Lefrancois-Gagnon
-Author-email: kgagnon@lakeheadu.ca
-License-File: LICENSE

@@ -10,6 +10,12 @@ The code is implemented primarily through RDKit, using a mix of the rdScaffoldNe
 Kevin Lefrancois-Gagnon
 Robert C. Mawhinney
 
+# Installation prior to distribution
+```
+pip install git+https://github.com/kmlefran/group_decomposition
+```
+
+
 # Usage Examples
 
 ## Identifying fragments in a single molecule
