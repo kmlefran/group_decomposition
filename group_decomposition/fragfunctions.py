@@ -116,7 +116,7 @@ def _set_double_bonded_in_ring(mol_frame):
     #         notinring.append(atom)
     #     else:
     #         inring.append(atom)
-    mol_frame_subset = mol_frame.loc[mol_frame['inRing'] is False,:]
+    mol_frame_subset = mol_frame.loc[mol_frame['inRing'] == False,:]
     #find the subset that have a label e.g. Ring 1, but not labeled inRing
     idx_to_update = list(mol_frame_subset.loc[mol_frame_subset['molPart'] != 'Unknown',:].index)
     mol_frame.loc[idx_to_update,['inRing']] = True #update the needed atoms to
@@ -208,7 +208,7 @@ def _find_group(check_atoms, molecule, not_in_ring,in_ring_py):
                     #if neighbour n is not in a ring, and not yet added to the group,
                     # add it to the group
                     grp = np.append(grp,n_at)
-                n_neigh_numpy = _find_neighbors(n_at)
+                n_neigh_numpy = _find_neighbors(molecule.GetAtomWithIdx(int(n_at)))
                 #neighbours not in ring
                 n_neigh_numpy = np.setdiff1d(n_neigh_numpy,in_ring_py)
                 #not in ring and not in neighbours of a
@@ -447,7 +447,8 @@ def _trim_molpart(mol_frame,mol_part_lst,molecule):
     return {'smiles':new_smi, 'count':count}
 
 
-def _break_molparts(mol_part_smi,count,drop_parent = True):
+def _break_molparts(mol_part_smi,count,drop_parent = True,
+                    patt = '[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35]):2]'):
     """For a given list of Smiles of the molecule parts, break non-ring groups into 
     Ertl functional groups and alkyl groups."""
     el_to_rm = []
@@ -456,7 +457,6 @@ def _break_molparts(mol_part_smi,count,drop_parent = True):
         molecule = Chem.MolFromSmiles(partsmi)
         if molecule.GetRingInfo().NumRings() == 0: #don't do this for rings
             #break sp3 carbon to ring/heteroatom bonds
-            patt='[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35]):2]'
             bonds_to_break = molecule.GetSubstructMatches(Chem.MolFromSmarts(patt))
             bonds = []
             labels = []
@@ -487,7 +487,8 @@ def _break_molparts(mol_part_smi,count,drop_parent = True):
     return out_smi
 
 
-def identify_connected_fragments(smile: str,keep_only_children=True) -> pd.DataFrame:
+def identify_connected_fragments(smile: str,keep_only_children:bool=True,
+            bb_patt:str='[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35]):2]') -> pd.DataFrame:
     """
     Given Smiles string, identify fragments in the molecule as follows:
     Break all ring-non-ring atom single bonds
@@ -501,6 +502,8 @@ def identify_connected_fragments(smile: str,keep_only_children=True) -> pd.DataF
         smile: a string containing smiles for a given molecule, does not need to be canonical
         keep_only_children: boolean, if True, when a group is broken down into its components
             remove the parent group from output. If False, parent group is retained
+        bb_patt: string of SMARTS pattern for bonds to be broken in side chains and linkers
+            defaults to cleaving sp3 carbon-((ring OR not sp3 carbon) AND not-placeholder/halogen)
     Returns:
         pandas data frame with columms 'Smiles', 'Molecule', 'numAttachments' and 'xyz'
         Containing, fragment smiles, fragment Chem.Molecule object, number of * placeholders,
@@ -518,7 +521,7 @@ def identify_connected_fragments(smile: str,keep_only_children=True) -> pd.DataF
     fragment_smiles = _trim_molpart(mol_frame,mol_frame['molPart'].unique(),mol)
     #break side chains and linkers into Ertl functional groups and alkyl chains
     full_smi = _break_molparts(fragment_smiles['smiles'],fragment_smiles['count']
-                               ,drop_parent=keep_only_children)
+                               ,drop_parent=keep_only_children,patt=bb_patt)
     #initialize the output data frame
     frag_frame = _generate_fragment_frame(full_smi)
     #add hydrogens and xyz coordinates resulting from MMFF94 opt, changing placeholders to At
@@ -554,26 +557,11 @@ def count_uniques(frag_frame:pd.DataFrame,drop_attachments=False) -> pd.DataFram
     no_connect_smile=[]
     for smile in smile_list:
         if drop_attachments:
-            mol = Chem.MolFromSmiles(smile)
-            non_zero_atoms=0
-            for atom in mol.GetAtoms():
-                if atom.GetAtomicNum() != 0:
-                    non_zero_atoms += 1
-            if non_zero_atoms > 1:
-                temp= re.sub('\[[0-9]+\*\]', '', smile)
-                t_mol = Chem.MolFromSmiles(re.sub('\(\)', '', temp))
-                if t_mol is None:
-                    t_mol=Chem.MolFromSmiles(re.sub('\[[0-9]+\*\]','*', smile))
-                    no_connect_smile.append(Chem.MolToSmiles(t_mol))
-                    #Warning('Could not construct {smile} without attachments'.format(smile=smile))
-                else:
-                    no_connect_smile.append(Chem.MolToSmiles(t_mol))
-            else:
-                no_connect_smile.append(Chem.MolToSmiles(Chem.MolFromSmiles(re.sub('\[[0-9]+\*\]',
-                                                                                  '*', smile))))
+            no_connect_smile.append(_drop_smi_attach(smile))
         else:
             no_connect_smile.append(Chem.MolToSmiles(Chem.MolFromSmiles(re.sub('\[[0-9]+\*\]',
                                                                              '*', smile))))
+    #identify unique smiles and count number of times they occur
     unique_smiles=[]
     unique_smiles_counts=[]
     for smile in no_connect_smile:
@@ -583,14 +571,43 @@ def count_uniques(frag_frame:pd.DataFrame,drop_attachments=False) -> pd.DataFram
         else:
             smi_ix = unique_smiles.index(smile)
             unique_smiles_counts[smi_ix] += 1
-    #here is where we subset to unique
-    uniquefrag_frame = pd.DataFrame(unique_smiles,columns=['Smiles'])
+    #create output frame
+    return _construct_unique_frame(uni_smi=unique_smiles,uni_smi_count=unique_smiles_counts)
+    # uniquefrag_frame = pd.DataFrame(unique_smiles,columns=['Smiles'])
+    # PandasTools.AddMoleculeColumnToFrame(uniquefrag_frame,'Smiles','Molecule',
+    #                                      includeFingerprints=True)
+    # uniquefrag_frame['count']=unique_smiles_counts
+    # uniquefrag_frame = _add_xyz_coords(uniquefrag_frame)
+    # uniquefrag_frame = _add_number_attachements(uniquefrag_frame)
+    # return uniquefrag_frame
+
+def _construct_unique_frame(uni_smi:list[str],uni_smi_count:list[int]) -> pd.DataFrame:
+    uniquefrag_frame = pd.DataFrame(uni_smi,columns=['Smiles'])
     PandasTools.AddMoleculeColumnToFrame(uniquefrag_frame,'Smiles','Molecule',
                                          includeFingerprints=True)
-    uniquefrag_frame['count']=unique_smiles_counts
+    uniquefrag_frame['count']=uni_smi_count
     uniquefrag_frame = _add_xyz_coords(uniquefrag_frame)
     uniquefrag_frame = _add_number_attachements(uniquefrag_frame)
     return uniquefrag_frame
+
+def _drop_smi_attach(smile:str):
+    mol = Chem.MolFromSmiles(smile)
+    non_zero_atoms=0
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() != 0:
+            non_zero_atoms += 1
+    if non_zero_atoms > 1:
+        temp= re.sub('\[[0-9]+\*\]', '', smile)
+        t_mol = Chem.MolFromSmiles(re.sub('\(\)', '', temp))
+        if t_mol is None:
+            t_mol=Chem.MolFromSmiles(re.sub('\[[0-9]+\*\]','*', smile))
+            out_smi = Chem.MolToSmiles(t_mol)
+            #Warning('Could not construct {smile} without attachments'.format(smile=smile))
+        else:
+            out_smi = Chem.MolToSmiles(t_mol)
+    else:
+        out_smi = Chem.MolToSmiles(Chem.MolFromSmiles(re.sub('\[[0-9]+\*\]','*', smile)))
+    return out_smi
 
 def merge_uniques(frame1:pd.DataFrame,frame2:pd.DataFrame) -> pd.DataFrame:
     """Given two frames of unique fragments, identify shared unique fragments,
@@ -623,19 +640,45 @@ def merge_uniques(frame1:pd.DataFrame,frame2:pd.DataFrame) -> pd.DataFrame:
         C       3
         C1CC1   2
 
-        merge_uniques(frame1,frame2) returns
+        >>> merge_uniques(frame1,frame2)
         Smiles  count
         C       5
         C1CCC1  1
         C1CC1   2
     """
-    made_frame=0
+    rows_to_drop = _find_rows_to_drop(frame1,frame2)
+    merge_frame = rows_to_drop['merge_frame']
+    drop_frame_1 = frame1.drop(rows_to_drop['drop_rows_1'])
+    drop_frame_2 = frame2.drop(rows_to_drop['drop_rows_2'])
+    merge_frame = _add_frame(drop_frame_1,merge_frame)
+    merge_frame = _add_frame(drop_frame_2,merge_frame)
+    return merge_frame
+
+def _add_frame(frame1:pd.DataFrame,merge_frame=pd.DataFrame()) -> pd.DataFrame:
+    if merge_frame.empty:
+        made_frame=0
+    else:
+        made_frame=1    
+    for i,smi in enumerate(frame1['Smiles']):
+        if made_frame == 0:
+            merge_frame = pd.DataFrame.from_dict({'Smiles':[smi],
+                                                 'count':list(frame1['count'])[i]})
+            made_frame=1
+        else:
+            merge_frame.loc[len(merge_frame)] = [smi, list(frame1['count'])[i]]
+    if merge_frame.empty:
+        merge_frame = pd.DataFrame()        
+    return merge_frame
+
+def _find_rows_to_drop(frame_a:pd.DataFrame,frame_b:pd.DataFrame) -> list[list[int]]:
     rows_to_drop_one = []
     rows_to_drop_two = []
-    for i,smi in enumerate(frame1['Smiles']):
-        if smi in list(frame2['Smiles']):
-            j=list(frame2['Smiles']).index(smi)
-            cum_count=frame1['count'][i] + frame2['count'][j]
+    made_frame = 0
+    merge_frame = pd.DataFrame()
+    for i,smi in enumerate(frame_a['Smiles']):
+        if smi in list(frame_b['Smiles']):
+            j=list(frame_b['Smiles']).index(smi)
+            cum_count=frame_a['count'][i] + frame_b['count'][j]
             if made_frame == 0:
                 merge_frame = pd.DataFrame.from_dict({'Smiles':[smi],'count':[cum_count]})
                 made_frame=1
@@ -643,23 +686,8 @@ def merge_uniques(frame1:pd.DataFrame,frame2:pd.DataFrame) -> pd.DataFrame:
                 merge_frame.loc[len(merge_frame)] = [smi, cum_count]
             rows_to_drop_one.append(i)
             rows_to_drop_two.append(j)
-    drop_frame_1 = frame1.drop(rows_to_drop_one)
-    drop_frame_2 = frame2.drop(rows_to_drop_two)
-    for i,smi in enumerate(drop_frame_1['Smiles']):
-        if made_frame == 0:
-            merge_frame = pd.DataFrame.from_dict({'Smiles':[smi],
-                                                 'count':list(drop_frame_1['count'])[i]})
-            made_frame=1
-        else:
-            merge_frame.loc[len(merge_frame)] = [smi, list(drop_frame_1['count'])[i]]
-    for i,smi in enumerate(drop_frame_2['Smiles']):
-        if made_frame == 0:
-            merge_frame = pd.DataFrame.from_dict({'Smiles':[smi],
-                                                 'count':list(drop_frame_2['count'])[i]})
-            made_frame=1
-        else:
-            merge_frame.loc[len(merge_frame)] = [smi, list(drop_frame_2['count'])[i]]
-    return merge_frame
+    return {'drop_rows_1':rows_to_drop_one,'drop_rows_2':rows_to_drop_two,
+            'merge_frame':merge_frame}
 
 
 def count_groups_in_set(list_of_smiles:list[str],drop_attachments:bool=False) -> pd.DataFrame:
