@@ -105,7 +105,7 @@ def eliminate_nonring_bonds(nodemolecules):
             if not bond.IsInRing():
                 b_at = bond.GetBeginAtom().GetAtomicNum()
                 e_at = bond.GetEndAtom().GetAtomicNum()
-                if bond.Getbond_type() != Chem.rdchem.bond_type.DOUBLE and  b_at != 0 and e_at != 0:
+                if bond.GetBondType() != Chem.rdchem.BondType.DOUBLE and  b_at != 0 and e_at != 0:
                     flag=0
                     break
         if flag == 1:
@@ -123,10 +123,10 @@ def eliminate_nonring_atoms(nodemolecules):
             #if atom is not in ring, check if it is double bonded to a ring
             if not atom.IsInRing():
                 for neigh in atom.GetNeighbors():
-                    bond_type = frag_mol.GetBondBetweenAtoms(idx,neigh.GetIdx()).Getbond_type()
+                    bond_type = frag_mol.GetBondBetweenAtoms(idx,neigh.GetIdx()).GetBondType()
                     #print(bond_type)
                     n_in_r = frag_mol.GetAtomWithIdx(neigh.GetIdx()).IsInRing()
-                    if  n_in_r and bond_type ==Chem.rdchem.bond_type.DOUBLE:
+                    if  n_in_r and bond_type ==Chem.rdchem.BondType.DOUBLE:
                         print('I passed the if')
                         non_ring_double=1
             #if not attachment (atomic number 0 used as attachments by rdScaffoldNetwork)
