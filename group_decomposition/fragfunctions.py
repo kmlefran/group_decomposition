@@ -486,6 +486,14 @@ def _break_molparts(mol_part_smi,count,drop_parent = True,
     out_smi  = mol_part_smi + new_smi #this is the Smiles of all fragments in the molecule
     return out_smi
 
+def generate_acylic_mol_frame(molecule):
+    atom_nums = utils.get_molecules_atomicnum(molecule)
+    false_list = [False] * len(atom_nums)
+    mol_part = ['Acyclic'] * len(atom_nums)
+    initialization_data = {'atomNum': atom_nums,
+                           'inRing': false_list, 
+                           'molPart': mol_part}
+    return pd.DataFrame(initialization_data)
 
 def identify_connected_fragments(smile: str,keep_only_children:bool=True,
             bb_patt:str='[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35]):2]') -> pd.DataFrame:
@@ -515,10 +523,15 @@ def identify_connected_fragments(smile: str,keep_only_children:bool=True,
     # ordering of atoms
     mol = utils.get_canonical_molecule(smile)
     #assign molecule into parts (Rings, side chains, peripherals)
-    mol_frame = generate_full_mol_frame(mol)
+    if mol.GetRingInfo().NumRings() > 0:
+        mol_frame = generate_full_mol_frame(mol)
+        fragment_smiles = _trim_molpart(mol_frame,mol_frame['molPart'].unique(),mol)
+    else:
+        mol_frame = generate_acylic_mol_frame(mol)
+        fragment_smiles = {'smiles':[Chem.MolToSmiles(mol)],'count':1}
     #break molecule into fragments defined by the unique parts in mol_frame (Ring 1, Peripheral 1,
     #  Linker 1, Linker 2, etc.)
-    fragment_smiles = _trim_molpart(mol_frame,mol_frame['molPart'].unique(),mol)
+    
     #break side chains and linkers into Ertl functional groups and alkyl chains
     full_smi = _break_molparts(fragment_smiles['smiles'],fragment_smiles['count']
                                ,drop_parent=keep_only_children,patt=bb_patt)
