@@ -84,7 +84,11 @@ def get_canonical_molecule(smile: str):
     """Ensures that molecule numbering is consistent with creating molecule from canonical 
     SMILES for consistency."""
     mol = Chem.MolFromSmiles(smile)
-    mol_smi = Chem.MolToSmiles(mol) #molsmi is canonical SMILES
+    if mol:
+        mol_smi = Chem.MolToSmiles(mol) #molsmi is canonical SMILES
+    else:
+        raise ValueError(f"""{smile} is not a valid SMILES code or 
+                         rdkit cannot construct a molecule from it""")    
     #create canonical molecule numbering from canonical SMILES
     return Chem.MolFromSmiles(mol_smi)
 
