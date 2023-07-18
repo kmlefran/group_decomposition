@@ -8,6 +8,7 @@ import sys
 sys.path.append(sys.path[0].replace('/src',''))
 import rdkit
 from rdkit import Chem
+from rdkit.Geometry import Point3D
 from rdkit.Chem.Scaffolds import rdScaffoldNetwork # scaffolding
 from rdkit.Chem import rdqueries # search for rdScaffoldAttachment points * to remove
 
@@ -79,6 +80,36 @@ def trim_placeholders(rwmol):
         for idx in rm_at_idx_sort: #remove atoms
             rwmol.RemoveAtom(idx)
     return rwmol
+
+def mol_from_sdf(sdf_file, xyz_file):
+    """takes sdf_file and returns mol wth atom numbers the same
+    from stackoverflow https://mattermodeling.stackexchange.com/questions/7234/how-to-input-3d-coordinates-from-xyz-file-and-connectivity-from-smiles-in-rdkit"""
+    m = Chem.MolFromMolFile(sdf_file)
+
+    # this assumes whatever program you use doesn't re-order atoms
+    #  .. which is usually a safe assumption
+    #  .. so we don't bother tracking atoms
+    atomic_symbols = []
+    xyz_coordinates = []
+
+    with open(xyz_file, "r") as file:
+        for line_number,line in enumerate(file):
+            if line_number == 0:
+                num_atoms = int(line)
+            elif line_number == 1:
+                comment = line # might have useful information
+            else:
+                atomic_symbol, x, y, z = line.split()
+                atomic_symbols.append(atomic_symbol)
+                xyz_coordinates.append([float(x),float(y),float(z)])
+
+    # from https://github.com/rdkit/rdkit/issues/2413
+    conf = m.GetConformer()
+# in principal, you should check that the atoms match
+    for i in range(m.GetNumAtoms()):
+        x,y,z = xyz_coordinates[i]
+        conf.SetAtomPosition(i,Point3D(x,y,z))
+    return conf
 
 def get_canonical_molecule(smile: str):
     """Ensures that molecule numbering is consistent with creating molecule from canonical 
