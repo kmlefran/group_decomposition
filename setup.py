@@ -1,6 +1,6 @@
 import setuptools
 setuptools.setup(name='group_decomposition',
-version='0.0.1',
+version='0.1.0',
 description='Extract fragments and counts of fragments from molecule SMILES codes',
 url='https://github.com/kmlefran/group_decomposition',
 author='Kevin M. Lefrancois-Gagnon',
