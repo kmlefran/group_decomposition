@@ -81,35 +81,69 @@ def trim_placeholders(rwmol):
             rwmol.RemoveAtom(idx)
     return rwmol
 
-def mol_from_sdf(sdf_file, xyz_file):
-    """takes sdf_file and returns mol wth atom numbers the same
-    from stackoverflow https://mattermodeling.stackexchange.com/questions/7234/how-to-input-3d-coordinates-from-xyz-file-and-connectivity-from-smiles-in-rdkit"""
-    m = Chem.MolFromMolFile(sdf_file)
+def mol_with_atom_index(mol):
+    #from https://www.rdkit.org/docs/Cookbook.html
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() != 0:
+            atom.SetAtomMapNum(atom.GetIdx()+1)
+    return mol
 
+
+def mol_from_molfile(mol_file):
+    """takes mol_file and returns mol wth atom numbers the same
+    #modified for mol file structure from retrievium
+    from stackexchange https://mattermodeling.stackexchange.com/questions/7234/how-to-input-3d-coordinates-from-xyz-file-and-connectivity-from-smiles-in-rdkit"""
+    m = Chem.MolFromMolFile(mol_file,removeHs=False)
+    if not m:
+        raise ValueError(f"""Problem creating molecule from {mol_file}""")
     # this assumes whatever program you use doesn't re-order atoms
     #  .. which is usually a safe assumption
     #  .. so we don't bother tracking atoms
+    m = mol_with_atom_index(m)
     atomic_symbols = []
     xyz_coordinates = []
-
-    with open(xyz_file, "r") as file:
+    ats_read = 0
+    num_atoms= m.GetNumAtoms()
+    print(num_atoms)
+    with open(mol_file, "r") as file:
         for line_number,line in enumerate(file):
-            if line_number == 0:
-                num_atoms = int(line)
-            elif line_number == 1:
-                comment = line # might have useful information
-            else:
-                atomic_symbol, x, y, z = line.split()
+            print(line_number)
+            print(line)
+            if ats_read <  num_atoms and line_number > 3:
+                ats_read += 1
+                x, y, z, atomic_symbol = line.split()[:4]
                 atomic_symbols.append(atomic_symbol)
                 xyz_coordinates.append([float(x),float(y),float(z)])
-
+            elif ats_read == num_atoms:
+                break
     # from https://github.com/rdkit/rdkit/issues/2413
-    conf = m.GetConformer()
+    # conf = m.GetConformer()
 # in principal, you should check that the atoms match
-    for i in range(m.GetNumAtoms()):
-        x,y,z = xyz_coordinates[i]
-        conf.SetAtomPosition(i,Point3D(x,y,z))
-    return conf
+    # for i in range(m.GetNumAtoms()):
+    #     print(i)
+    #     x,y,z = xyz_coordinates[i]
+    #     conf.SetAtomPosition(i,Point3D(x,y,z))
+    return {'Molecule': m, 'xyz_pos':xyz_coordinates,'atomic_symbols':atomic_symbols}
+
+def xyz_from_cml(cml_file):
+    num_atom_array=0
+    geom_list = []
+    with open(cml_file, "r") as file:
+        for line in file:
+            if 'atomArray' in line:
+                num_atom_array += 1
+                if num_atom_array == 5:
+                    continue
+            if num_atom_array == 5:
+                print(line)
+                space_split = line.split()
+                x_split = space_split[3].split("=")
+                y_split = space_split[4].split("=")
+                z_split = space_split[5].split("=")
+                geom_list.append([float(eval(x_split[1])),float(eval(y_split[1])), float(eval(z_split[1]))])
+            elif num_atom_array == 6:
+                break        
+    return geom_list
 
 def get_canonical_molecule(smile: str):
     """Ensures that molecule numbering is consistent with creating molecule from canonical 
@@ -123,10 +157,13 @@ def get_canonical_molecule(smile: str):
     #create canonical molecule numbering from canonical SMILES
     return Chem.MolFromSmiles(mol_smi)
 
+
+    
+
 def copy_molecule(molecule):
     """create a copy of molecule object in new object(not pointer)"""
-    mol_smi = Chem.MolToSmiles(molecule)
-    return Chem.MolFromSmiles(mol_smi)
+    #see link https://sourceforge.net/p/rdkit/mailman/message/33652439/
+    return Chem.Mol(molecule)
 
 def clean_smile(trim_smi):
     """remove leftover junk from smiles when atom deleted."""
