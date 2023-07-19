@@ -104,11 +104,8 @@ def mol_from_molfile(mol_file):
     xyz_coordinates = []
     ats_read = 0
     num_atoms= m.GetNumAtoms()
-    print(num_atoms)
     with open(mol_file, "r") as file:
         for line_number,line in enumerate(file):
-            print(line_number)
-            print(line)
             if ats_read <  num_atoms and line_number > 3:
                 ats_read += 1
                 x, y, z, atomic_symbol = line.split()[:4]
@@ -135,7 +132,6 @@ def xyz_from_cml(cml_file):
                 if num_atom_array == 5:
                     continue
             if num_atom_array == 5:
-                print(line)
                 space_split = line.split()
                 x_split = space_split[3].split("=")
                 y_split = space_split[4].split("=")
@@ -211,7 +207,6 @@ def eliminate_nonring_atoms(nodemolecules):
                     #print(bond_type)
                     n_in_r = frag_mol.GetAtomWithIdx(neigh.GetIdx()).IsInRing()
                     if  n_in_r and bond_type ==Chem.rdchem.BondType.DOUBLE:
-                        print('I passed the if')
                         non_ring_double=1
             #if not attachment (atomic number 0 used as attachments by rdScaffoldNetwork)
             if atom.GetAtomicNum() != 0:
