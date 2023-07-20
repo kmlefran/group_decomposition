@@ -1,4 +1,4 @@
-Packages required:
+Packages required: (conda commands for them given)
 rdkit
     conda install -c rdkit rdkit
 pandas

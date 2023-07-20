@@ -192,6 +192,70 @@ def eliminate_nonring_bonds(nodemolecules):
             ring_frags.append(frag)
     return ring_frags
 
+def link_molecules(mol_1:Chem.Mol,mol_2:Chem.Mol,dl_1:int,dl_2:int):
+    """Given two mols, each with dummy atoms that have dummyAtomLabels, link the molecules between the dummy atoms specified by labels dl_1 and dl_2
+    
+    Modified from https://www.oloren.ai/blog/add_rgroup.html
+    Written by David Huang, Oloren AI, modified by Kevin Lefrancois-Gagnon
+
+    Args:
+        mol_1: Chem.Mol object
+        mol_2: Chem.Mol object
+        dl_1: the isotope of the dummy atom in mol_1 which will be replaced by mol_2
+         dl_2: the isotope of the dummy atom in mol_2 which will be replaced by mol_1
+          
+    Returns:
+        Chem.Mol object with mol_1 and mol_2 linked where dl_1 and dl_2 were """
+
+
+    # Loop over atoms until there are no wildcard atoms
+    # Find wildcard atom if available, otherwise exit
+    #We use the isotope here are FragmentOnBonds labels the dummy atoms by changing their isotope
+    a = None
+    for a_ in mol_1.GetAtoms():
+        if a_.GetAtomicNum() == 0 and a_.GetIsotope() == dl_1:
+            a = a_
+            break
+    if not a:
+        raise ValueError(f"""Input molecule mol_1 does not have atom with dummy label {dl_1}""")
+    b = None
+    for b_ in mol_2.GetAtoms():
+        if b_.GetAtomicNum() == 0 and b_.GetIsotope() == dl_2:
+            b = b_
+            break
+    if not b:
+        raise ValueError(f"""Input molecule mol_1 does not have atom with dummy label {dl_2}""")
+    # Set wildcard atoms to having AtomMapNum 1000 for tracking
+    a.SetAtomMapNum(1000)
+    b.SetAtomMapNum(1000)
+    # Put group and base molecule together and make it editable
+    m = Chem.CombineMols(mol_1, mol_2)
+    m = Chem.RWMol(m)
+    # Find using tracking number the atoms to merge in new molecule
+    a1 = None
+    a2 = None
+    for at in m.GetAtoms():
+        if at.GetAtomMapNum() == 1000:
+            if a1 is None:
+                a1 = at
+            else:
+                a2 = at
+    # Find atoms to bind together based on atoms to merge
+    b1 = a1.GetBonds()[0]
+    start = (b1.GetBeginAtomIdx() if b1.GetEndAtomIdx() == a1.GetIdx()
+        else b1.GetEndAtomIdx())
+
+    b2 = a2.GetBonds()[0]
+    end = (b2.GetBeginAtomIdx() if b2.GetEndAtomIdx() == a2.GetIdx()
+        else b2.GetEndAtomIdx())
+
+    # Add the connection and remove original wildcard atoms
+    m.AddBond(start, end, order=Chem.rdchem.BondType.SINGLE)
+    m.RemoveAtom(a1.GetIdx())
+    m.RemoveAtom(a2.GetIdx())
+
+    return m
+
 def eliminate_nonring_atoms(nodemolecules):
     """given list of molecules of utils.get_scaffold_vertices output, removes molecules that 
     contain atoms that are not in ring or not double bonded to ring."""

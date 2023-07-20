@@ -17,7 +17,6 @@ from rdkit.Chem.Scaffolds import rdScaffoldNetwork # scaffolding
 import pandas as pd #lots of work with data frames
 import numpy as np #for arrays in fragment identification
 sys.path.append(sys.path[0].replace('/src',''))
-from group_decomposition import ifg
 from group_decomposition import utils
 
 
