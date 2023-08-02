@@ -9,9 +9,11 @@ count_uniques - takes output from above, removes attachments and counts unique f
 count_groups_in_set - takes list of SMILES and counts unique fragments on set
 """
 import sys
+import os
 import re
 import rdkit
 from rdkit import Chem
+import math
 from rdkit.Chem import AllChem, PandasTools, rdqueries #used for 3d coordinates
 from rdkit.Chem.Scaffolds import rdScaffoldNetwork # scaffolding
 import pandas as pd #lots of work with data frames
@@ -19,7 +21,19 @@ import numpy as np #for arrays in fragment identification
 sys.path.append(sys.path[0].replace('/src',''))
 from group_decomposition import utils
 
-
+_H_BOND_LENGTHS = {
+    #from Gaussview default cleaned bond length
+    'C':1.07,
+    'O':0.96,
+    'N':1.00,
+    'F':0.88,
+    'Cl':1.29,
+    'B':1.18,
+    'Al':1.55,
+    'Si':1.47,
+    'P':1.35,
+    'S':1.31
+}
 
 def _initialize_molecule_frame(molecule, xyz_coords=[]):
     """Given a molecule, assign create frame with atomic numbers, Boolean of if in ring
@@ -429,10 +443,25 @@ def generate_acyclic_mol_frame(molecule, xyz_coords=[]):
                            'molPart': mol_part}
     return pd.DataFrame(initialization_data)
 
+def csv_frag_generation(csv_file):
+    """Untested"""
+    inp_frame = pd.read_csv(csv_file)
+    out_frame = pd.DataFrame()
+    for i in range(len(inp_frame.index)):
+        mol_file = inp_frame['MolFile'][i]
+        cml_file = inp_frame['CmlFile'][i]
+        temp_frame = identify_connected_fragments(mol_file,input_type='molfile',
+                                                  cml_file=cml_file,include_parent=True)
+        temp_unique_frame = count_uniques(temp_frame)
+        out_frame = merge_uniques(out_frame,temp_unique_frame)
+    parent_mols = out_frame['Parent'].unique()
+    for mol in parent_mols:
+        output_ifc_gjf(mol,out_frame[[out_frame['Parent']==mol]])
+    return out_frame
 
 def identify_connected_fragments(input: str,keep_only_children:bool=True,
             bb_patt:str='[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35;!#1]):2]',
-            input_type = 'smile',cml_file='') -> pd.DataFrame:
+            input_type = 'smile',cml_file='',include_parent=False) -> pd.DataFrame:
     """
     Given Smiles string, identify fragments in the molecule as follows:
     Break all ring-non-ring atom single bonds
@@ -450,6 +479,8 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
         bb_patt: string of SMARTS pattern for bonds to be broken in side chains and linkers
             defaults to cleaving sp3 carbon-((ring OR not sp3 carbon) AND not-placeholder/halogen/H)
         input_type = 'smile' if SMILES code or 'molfile' if .mol file
+        include_parent = Boolean. If True, include column in output frame repeating parent molecule
+            intended use for True when merging multiple molecule fragment frames but need to retain a parent molecule object
     Returns:
         pandas data frame with columms 'Smiles', 'Molecule', 'numAttachments' and 'xyz'
         Containing, fragment smiles, fragment Chem.Molecule object, number of * placeholders,
@@ -494,16 +525,27 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
     if input_type == 'molfile': #clear map labels and add xyz coordinates that are available
         frag_frame = _add_frag_comp(frag_frame,mol)
         frag_frame['Smiles'] = frag_frame['Smiles'].map(_clear_map_number)
-        frag_frame['xyz'] = frag_frame['Atoms'].map(lambda x:_add_rtr_xyz(x,xyz_coords,atomic_symb))
+        frag_frame['xyz'] = frag_frame['Atoms'].map(lambda x:_add_rtr_xyz(x,xyz_coords))
+        frag_frame['Labels'] = frag_frame['Atoms'].map(lambda x:_add_rtr_label(x,atomic_symb))
         frag_frame['Molecule'] = frag_frame['Molecule'].map(lambda x:_clear_map_number(x,'mol'))    
+    if include_parent:
+        frag_frame['Parent'] = [mol] * len(frag_frame.index)
     return frag_frame
 
-def _add_rtr_xyz(at_num_list,xyz_coords,atomic_symbols):
-    """Construct string of atomSymbol x y z format, for use to map to frag_frame"""
-    out_str = ''
+def _add_rtr_label(at_num_list,atomic_symb):
+    out_list = []
     for atom in at_num_list:
-        out_str = out_str + atomic_symbols[atom-1] + '  ' + str(xyz_coords[atom-1][0]) + '  ' + str(xyz_coords[atom-1][1]) + '  ' +  str(xyz_coords[atom-1][2]) + '\n'
-    return out_str
+        # out_str + atomic_symbols[atom-1] + '  ' + str(xyz_coords[atom-1][0]) + '  ' + str(xyz_coords[atom-1][1]) + '  ' +  str(xyz_coords[atom-1][2]) + '\n'
+        out_list.append(atomic_symb[atom-1])
+    return out_list
+
+def _add_rtr_xyz(at_num_list,xyz_coords):
+    """Construct string of atomSymbol x y z format, for use to map to frag_frame"""
+    out_list = []
+    for atom in at_num_list:
+        # out_str + atomic_symbols[atom-1] + '  ' + str(xyz_coords[atom-1][0]) + '  ' + str(xyz_coords[atom-1][1]) + '  ' +  str(xyz_coords[atom-1][2]) + '\n'
+        out_list.append(xyz_coords[atom-1])
+    return out_list
 
 def _clear_map_number(mol_input, ret_type='smi'):
     """Given str or Chem.Molecule input, remove atomMapnumbers from atoms and return 
@@ -581,6 +623,15 @@ def count_uniques(frag_frame:pd.DataFrame,drop_attachments=False) -> pd.DataFram
     else:
         xyz_inc = False    
     smile_list = frag_frame['Smiles']
+    if 'Atoms' in col_names:
+        atom_list = frag_frame['Atoms']
+        atoms_inc = True
+    if 'Labels' in col_names:
+        labels_list = frag_frame['Labels']
+        labels_inc = True
+    if 'Parent' in col_names:
+        parent_list = frag_frame['Parent']
+        parent_inc = True
     no_connect_smile=[]
     #Clean smiles - either removing placeholder entirely(drop_attachments True)
     # Or just removing the dummyAtomLabel (drop_attachments False)
@@ -608,10 +659,254 @@ def count_uniques(frag_frame:pd.DataFrame,drop_attachments=False) -> pd.DataFram
             unique_smiles_counts[smi_ix] += 1
     #create output frame
     if xyz_inc:
-        return _construct_unique_frame(uni_smi=unique_smiles,uni_smi_count=unique_smiles_counts,xyz=unique_xyz)
+        un_frame =  _construct_unique_frame(uni_smi=unique_smiles,uni_smi_count=unique_smiles_counts,xyz=unique_xyz)
     else:
-        return _construct_unique_frame(uni_smi=unique_smiles,uni_smi_count=unique_smiles_counts)
+        un_frame =  _construct_unique_frame(uni_smi=unique_smiles,uni_smi_count=unique_smiles_counts)
+    if atoms_inc:
+        un_frame['Atoms'] = atom_list
+    if labels_inc:
+        un_frame['Labels'] = labels_list
+    if parent_inc:
+        un_frame['Parent'] = parent_list
+    return un_frame
 
+def _find_neigh_notin_frag(mol,at_list):
+    #for atoms with one attachment point
+    out_nbr=0
+    for idx in at_list:
+        atom = mol.GetAtomWithIdx(idx-1)
+        nbrs = atom.GetNeighbors()
+        for nbr in nbrs:
+            nbr_idx = nbr.GetIdx()+1
+            if nbr_idx not in at_list:
+                out_nbr = nbr_idx
+                out_at = atom.GetIdx()+1
+                break
+        if out_nbr:
+            break
+    return [out_at, out_nbr]
+
+def _find_neigh_xyz(frag_frame,neigh_idx):
+    """Given frag_frame and index of neighbor atom, find its xyz coordinates"""
+    #column index
+    atoms_idx = list(frag_frame.columns).index('Atoms')
+    #determine which row contains the neighbor atom
+    neigh_bool = list(frag_frame.apply(lambda row: neigh_idx in row[atoms_idx],axis=1))
+    # print(neigh_bool)
+    neigh_row = neigh_bool.index(True)
+    list_xyz = frag_frame['xyz'][neigh_row]
+    #find where in list neighbor atom is, return xyz at that index
+    neigh_list_idx = frag_frame['Atoms'][neigh_row].index(neigh_idx)
+    neigh_xyz = list_xyz[neigh_list_idx]
+    return neigh_xyz
+
+def _move_along_bond(at_xyz,neigh_xyz,at_symb):
+    """Returns xyz coordinates of neigh_xyz moved along bond to H bond length"""
+    at_np = np.array(at_xyz)
+    nb_np = np.array(neigh_xyz)
+    #vector for bond to move along
+    bond = at_np-nb_np
+    #bond length to find
+    target_length = _H_BOND_LENGTHS[at_symb]
+    steps = np.linspace(0.,1.,100)
+    #step along bond starting at neigh_xyz in direction of at_xyz.
+    #stop when bond length is target
+    for s in steps:
+        new_xyz = neigh_xyz + s * bond
+        if abs(_get_dist(new_xyz,at_np) - target_length) < 0.01:
+            end_xyz = new_xyz
+    #return target point
+    return end_xyz
+
+def _get_dist(point_a,point_b):
+    """Return distance btw two points"""
+    return math.sqrt((point_a[0]-point_b[0])**2 + (point_a[1]-point_b[1])**2 + (point_a[2]-point_b[2])**2)
+
+def _find_H_xyz(mol,at_list,xyz_list,frag_frame):
+    """Finds xyz of hydrogen atom that would be connected to a fragment
+    
+    Args:
+        mol: Chem.Mol object
+        at_list: list[int] - list of atoms in the fragment
+            Note: these start at 1, but those in molecule start at 0.
+            To convert add/subtract 1
+        xyz_list: list of xyz_coordinates of atoms in fragment
+        frag_frame: full parent frag_frame WITHOUT filtering by number of attachments
+    
+    Returns:
+        list[float]: xyz coordinates where H should be placed
+    """
+    #find attached atom index and neighbor index in molecule
+    at_idx, neigh_idx = _find_neigh_notin_frag(mol,at_list)
+    #get attached atom symbol
+    symb = mol.GetAtomWithIdx(at_idx-1).GetSymbol()
+    #index of the attached atom in at_list, which is the same as xyz_list
+    list_idx = at_list.index(at_idx)
+    #attached atom xyz
+    at_xyz = xyz_list[list_idx]
+    # neighbor atom xyz
+    neigh_xyz = _find_neigh_xyz(frag_frame,neigh_idx)
+    # move neighbor atom xyz along bond to H bond length (Gaussview defaults)
+    h_xyz = _move_along_bond(at_xyz,neigh_xyz,symb)
+    return h_xyz
+
+def _clean_molecule_name(smile):
+    """Removes symbols in smile code unfit for file name"""
+    smile = smile.replace('-','Neg')
+    smile = smile.replace('[','-')
+    smile = smile.replace(']','-')
+    smile = smile.replace('(','-')
+    smile = smile.replace(')','-')
+    smile = smile.replace('#','t')
+    smile = smile.replace('=','d')
+    smile = smile.replace('+','Pos')
+    smile = smile.replace('*','')
+    smile = smile.replace('@','')
+    return smile
+
+def output_ifc_gjf(mol,frag_frame,esm='wb97xd',basis_set='aug-cc-pvtz',wfx=True,n_procs=4,mem='3200MB',multiplicity=1):
+    """ Takes a fragmented molecule and outputs gjf files of the fragments with one
+    attachment point. Hydrogen is added in place of the connection to the rest of
+    the molecule for the fragment
+
+    Args:
+        mol: Chem.Mol object for which fragmentation was performed
+        frag_frame: output from either count_uniques or identify_connected_fragments
+        esm: str, electronic structure method to include in gjf
+        basis_set: str, basis set to include in gjf
+        wfx: Boolean, if True add output=wfx to gjf file
+        n_procs: int, >=0. if >0, add number of processors to be used to gjf
+        mem: str, format "nMB" or "nGB", memory to be used in gjf
+        multiplicity: int, defaults to 1. Multiplicity of molecule
+    
+    Returns:
+        Creates gjf files in working directory for each fragment in frag_frame
+    
+    Notes:
+        H position is set by taking the atom the fragment is bonded two, replacing it with H
+          and moving that closer to the C until it reaches the default distance
+        Default distances taken from Gaussview "clean" C-H, C-O, etc bond lengths
+    """
+    on_at_frame  = pd.DataFrame(frag_frame[frag_frame['numAttachments']==1])
+    col_names = list(on_at_frame.columns)
+    #Find indices of relevant columns
+    xyz_idx = col_names.index('xyz')
+    atoms_idx = col_names.index('Atoms')
+    labels_idx = col_names.index('Labels')
+    mol_idx = col_names.index('Molecule')
+    #Find H xyz position and index of atom bonded to H
+    on_at_frame['H_xyz'] = on_at_frame.apply(lambda row : _find_H_xyz(mol, row[atoms_idx],row[xyz_idx],frag_frame),axis=1)
+    on_at_frame['at_idx'] = on_at_frame.apply(lambda row : _find_at_idx(mol,row[atoms_idx]),axis=1)
+    hxyz = len(col_names)
+    atidx = len(col_names)+1
+    # print(on_at_frame)
+    #write gjfs
+    on_at_frame.apply(lambda row : _write_frag_gjf(frag_mol=row[mol_idx],xyz_list=row[xyz_idx],symb_list=row[labels_idx],h_xyz=row[hxyz],at_idx=row[atidx],esm=esm,basis_set=basis_set,wfx=wfx,n_procs=n_procs,mem=mem,multiplicity=multiplicity),axis=1)
+    return
+
+def _clean_basis(basis_set):
+    basis_set = basis_set.replace('(','')
+    basis_set = basis_set.replace(')','')
+    basis_set = basis_set.replace(',','')
+    basis_set = basis_set.replace('+','p')
+    return basis_set
+
+def _write_frag_gjf(frag_mol, xyz_list, symb_list,h_xyz,at_idx,esm='wb97xd',basis_set='aug-cc-pvtz',wfx=True,n_procs=4,mem='3200MB',multiplicity=1):
+    """Write the gjf file for a fragment. 
+    Args:
+        frag_mol: Chem.Mol object
+        xyz_list: list of xyz_coords of list
+        symb_list: list of atomic symbols of fragment
+        h_xyz: xyz coords of hydrogen attached to fragment
+        at_idx: index of attached atom in fragment
+        esm: str, electronic structure method to include in gjf
+        basis_set: str, basis set to include in gjf
+        wfx: Boolean, if True add output=wfx to gjf file
+        n_procs: int, >=0. if >0, add number of processors to be used to gjf
+        mem: str, format "nMB" or "nGB", memory to be used in gjf
+        multiplicity: int, defaults to 1. Multiplicity of molecule
+    
+    Default template:
+        %chk={filename}.chk
+        %nprocs=4
+        %mem=3200MB
+        # esm/basis_set opt freq output=wfx
+
+        smile
+
+        charge mult
+        {xyz}
+
+        {filename}.wfx
+
+    """
+    num_atoms = len(symb_list)
+    smile = re.sub('\[[0-9]+\*\]', '*', Chem.MolToSmiles(frag_mol,canonical=False))
+    charge = Chem.GetFormalCharge(frag_mol)
+    molecule_name = _clean_molecule_name(smile)
+    # print(at_idx)
+    # print(xyz_list[at_idx])
+    # print(h_xyz)
+    #build xyz of molecule
+    out_xyz = [xyz_list[at_idx],h_xyz]
+    for i in range(num_atoms):
+        if i != at_idx:
+            out_xyz.append(xyz_list[i])
+    geom_frame = pd.DataFrame(out_xyz,columns=['x','y','z'])
+    symb_list.insert(1,'H')
+    geom_frame['Atom'] = symb_list
+    geom_frame = geom_frame[['Atom','x','y','z']]
+    #create file name
+    clean_basis = _clean_basis(basis_set)
+    new_file_name = 'SubH'+'_'+molecule_name+'through'+symb_list[0] + '_' + esm+'_'+clean_basis
+    if os.path.exists(new_file_name+'.gjf'):
+        # print('deleting')
+        os.remove(new_file_name+'.gjf')
+    #write file
+    with open(new_file_name+'.gjf', 'a') as f:
+        f.write("%chk={chk}\n".format(chk=new_file_name+'.chk'))
+        if n_procs:
+            f.write('%nprocs={nprocs}\n'.format(nprocs=n_procs))
+        if mem:
+            f.write('%mem={mem}\n'.format(mem=mem))
+        if wfx:
+            f.write('#p {esm}/{bas} opt freq output=wfx\n'.format(esm=esm,bas=basis_set))
+        else:
+            f.write('#p {esm}/{bas} opt freq\n'.format(esm=esm,bas=basis_set))
+        f.write('\n')
+        f.write(f'{smile}')
+        f.write('\n\n')
+        f.write('{q} {mul}\n'.format(q=charge,mul=multiplicity))
+        dfAsString = geom_frame.to_string(header=False, index=False)
+        f.write(dfAsString)
+        f.write('\n\n')
+        if wfx:
+            f.write(new_file_name+'.wfx\n\n\n')
+        else:
+            f.write('\n\n\n')    
+    return
+
+def _find_at_idx(mol,at_list):
+    """Returns index of atom connected to the remainder of the molecule in the list 
+    of fragment atom numbers
+
+    Args: 
+        mol: Chem.Mol object
+        at_list: list[int] of atoms in molecule belonging to fragment being studied
+            Note: these indices start at 1, while those in the molecule start at 0
+    
+    Returns:
+        int of index of connected atom in at_list. See examples for worked explanation
+    
+    Example: a fragment is defined by atoms [1,3,5,6,8]
+    Atom 3 is where the remainder of the molecule attaches to the fragment
+    The function returns the index of 3 in the atom list.
+    In this case, it would return 1
+    """
+    #find
+    at_idx = _find_neigh_notin_frag(mol,at_list)[0]
+    list_idx = at_list.index(at_idx)
+    return list_idx
 
 def _construct_unique_frame(uni_smi:list[str],uni_smi_count:list[int],xyz='') -> pd.DataFrame:
     """given smiles, counts and (optional) xyz coordinates, create frame"""
@@ -685,13 +980,18 @@ def merge_uniques(frame1:pd.DataFrame,frame2:pd.DataFrame) -> pd.DataFrame:
         C1CCC1  1
         C1CC1   2
     """
-    rows_to_drop = _find_rows_to_drop(frame1,frame2)
-    merge_frame = rows_to_drop['merge_frame']
-    #TODO simply concat data frames
-    drop_frame_1 = frame1.drop(rows_to_drop['drop_rows_1'])
-    drop_frame_2 = frame2.drop(rows_to_drop['drop_rows_2'])
-    merge_frame = _add_frame(drop_frame_1,merge_frame)
-    merge_frame = _add_frame(drop_frame_2,merge_frame)
+    if frame1.empty:
+        merge_frame = frame2
+    elif frame2.empty:
+        merge_frame = frame1
+    else:
+        rows_to_drop = _find_rows_to_drop(frame1,frame2)
+        merge_frame = rows_to_drop['merge_frame']
+        #TODO simply concat data frames
+        drop_frame_1 = frame1.drop(rows_to_drop['drop_rows_1'])
+        drop_frame_2 = frame2.drop(rows_to_drop['drop_rows_2'])
+        merge_frame = _add_frame(drop_frame_1,merge_frame)
+        merge_frame = _add_frame(drop_frame_2,merge_frame)
     return merge_frame
 
 def _add_frame(frame1:pd.DataFrame,merge_frame=pd.DataFrame()) -> pd.DataFrame:
