@@ -626,12 +626,18 @@ def count_uniques(frag_frame:pd.DataFrame,drop_attachments=False) -> pd.DataFram
     if 'Atoms' in col_names:
         atom_list = frag_frame['Atoms']
         atoms_inc = True
+    else:
+        atoms_inc = False
     if 'Labels' in col_names:
         labels_list = frag_frame['Labels']
         labels_inc = True
+    else:
+        labels_inc = False
     if 'Parent' in col_names:
         parent_list = frag_frame['Parent']
         parent_inc = True
+    else:
+        parent_inc = False
     no_connect_smile=[]
     #Clean smiles - either removing placeholder entirely(drop_attachments True)
     # Or just removing the dummyAtomLabel (drop_attachments False)
@@ -760,7 +766,7 @@ def _clean_molecule_name(smile):
     smile = smile.replace('#','t')
     smile = smile.replace('=','d')
     smile = smile.replace('+','Pos')
-    smile = smile.replace('*','')
+    smile = smile.replace('*','Att')
     smile = smile.replace('@','')
     return smile
 
@@ -858,7 +864,7 @@ def _write_frag_gjf(frag_mol, xyz_list, symb_list,h_xyz,at_idx,esm='wb97xd',basi
     geom_frame = geom_frame[['Atom','x','y','z']]
     #create file name
     clean_basis = _clean_basis(basis_set)
-    new_file_name = 'SubH'+'_'+molecule_name+'through'+symb_list[0] + '_' + esm+'_'+clean_basis
+    new_file_name = 'SubH'+'_'+molecule_name + '_' + esm+'_'+clean_basis
     if os.path.exists(new_file_name+'.gjf'):
         # print('deleting')
         os.remove(new_file_name+'.gjf')
