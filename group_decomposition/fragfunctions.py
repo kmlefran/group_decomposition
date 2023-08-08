@@ -479,6 +479,7 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
         bb_patt: string of SMARTS pattern for bonds to be broken in side chains and linkers
             defaults to cleaving sp3 carbon-((ring OR not sp3 carbon) AND not-placeholder/halogen/H)
         input_type = 'smile' if SMILES code or 'molfile' if .mol file
+        cml_file: defaults to none, can be the cml file corresponding to the input .mol file
         include_parent = Boolean. If True, include column in output frame repeating parent molecule
             intended use for True when merging multiple molecule fragment frames but need to retain a parent molecule object
     Returns:
@@ -652,6 +653,12 @@ def count_uniques(frag_frame:pd.DataFrame,drop_attachments=False) -> pd.DataFram
     unique_smiles=[]
     if xyz_inc:
         unique_xyz = []
+    if atoms_inc:
+        unique_atoms = []
+    if labels_inc:
+        unique_labels = []
+    if parent_inc:
+        unique_parents = []
     unique_smiles_counts=[]
     #Identify unique smiles, counting every occurence and adding xyz if included
     for i,smile in enumerate(no_connect_smile):
@@ -659,6 +666,12 @@ def count_uniques(frag_frame:pd.DataFrame,drop_attachments=False) -> pd.DataFram
             unique_smiles.append(smile)
             if xyz_inc:
                 unique_xyz.append(xyz_list[i])
+            if atoms_inc:
+                unique_atoms.append(atom_list[i])
+            if labels_inc:
+                unique_labels.append(labels_list[i])
+            if parent_inc:
+                unique_parents.append(parent_list[i])
             unique_smiles_counts.append(1)
         else:
             smi_ix = unique_smiles.index(smile)
@@ -669,11 +682,11 @@ def count_uniques(frag_frame:pd.DataFrame,drop_attachments=False) -> pd.DataFram
     else:
         un_frame =  _construct_unique_frame(uni_smi=unique_smiles,uni_smi_count=unique_smiles_counts)
     if atoms_inc:
-        un_frame['Atoms'] = atom_list
+        un_frame['Atoms'] = unique_atoms
     if labels_inc:
-        un_frame['Labels'] = labels_list
+        un_frame['Labels'] = unique_labels
     if parent_inc:
-        un_frame['Parent'] = parent_list
+        un_frame['Parent'] = unique_parents
     return un_frame
 
 def _find_neigh_notin_frag(mol,at_list):
@@ -1038,7 +1051,7 @@ def _find_rows_to_drop(frame_a:pd.DataFrame,frame_b:pd.DataFrame) -> list[list[i
             'merge_frame':merge_frame}
 
 
-def count_groups_in_set(list_of_smiles:list[str],drop_attachments:bool=False) -> pd.DataFrame:
+def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,input_type='smile',bb_patt= '[$([C;X4;!R]):1]-[$([R,!$([C;X4]',cml_list=[]) -> pd.DataFrame:
     """Identify unique fragments in molecules defined in the list_of_smiles, 
     and count the number of occurences for duplicates.
     Args:
@@ -1046,6 +1059,10 @@ def count_groups_in_set(list_of_smiles:list[str],drop_attachments:bool=False) ->
         drop_attachments: Boolean for whether or not to drop attachment points from fragments
             if True, will remove all placeholder atoms indicating connectivity
             if False, placeholder atoms will remain
+        input_type: smile or molfile, based on elements of lists_of_inputs
+        cml_list = defaults empty, but can be a list of cml files corresponding to the molfile inputs
+        #bb_patt = SMARTS pattern for bonds to break in linkers and side chains. Defaults to breaking 
+            bonds between nonring carbons with four bonds single bonded to ring atoms or carbons that don't have four bonds, and are not H, halide, or placeholder
     Returns:
         an output pd.DataFrame, with columns 'Smiles' for fragment Smiles, 
         'count' for number of times each fragment occurs in the list, and 
@@ -1055,8 +1072,11 @@ def count_groups_in_set(list_of_smiles:list[str],drop_attachments:bool=False) ->
         count_groups_in_set(['c1ccc(c(c1)c2ccc(o2)C(=O)N3C[C@H](C4(C3)CC[NH2+]CC4)C(=O)NCCOCCO)F',
         'Cc1nc2ccc(cc2s1)NC(=O)c3cc(ccc3N4CCCC4)S(=O)(=O)N5CCOCC5'],drop_attachments=False)."""
     i=0
-    for smile in list_of_smiles:
-        frame = identify_connected_fragments(smile)
+    for i,inp in enumerate(list_of_inputs):
+        if cml_list:
+            frame = identify_connected_fragments(inp,bb_patt=bb_patt,input_type=input_type,cml_file=cml_list[i])
+        else:
+            frame = identify_connected_fragments(inp,bb_patt=bb_patt,input_type=input_type)
         unique_frame = count_uniques(frame,drop_attachments)
         if i==0:
             i+=1
