@@ -1057,7 +1057,7 @@ def _find_rows_to_drop(frame_a:pd.DataFrame,frame_b:pd.DataFrame) -> list[list[i
             'merge_frame':merge_frame}
 
 
-def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,input_type='smile',bb_patt= '[$([C;X4;!R]):1]-[$([R,!$([C;X4]',cml_list=[]) -> pd.DataFrame:
+def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,input_type='smile',bb_patt= '[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35;!#1]):2]',cml_list=[]) -> pd.DataFrame:
     """Identify unique fragments in molecules defined in the list_of_smiles, 
     and count the number of occurences for duplicates.
     Args:
@@ -1079,6 +1079,7 @@ def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,inp
         'Cc1nc2ccc(cc2s1)NC(=O)c3cc(ccc3N4CCCC4)S(=O)(=O)N5CCOCC5'],drop_attachments=False)."""
     i=0
     for i,inp in enumerate(list_of_inputs):
+        print(inp)
         if cml_list:
             frame = identify_connected_fragments(inp,bb_patt=bb_patt,input_type=input_type,cml_file=cml_list[i])
         else:
