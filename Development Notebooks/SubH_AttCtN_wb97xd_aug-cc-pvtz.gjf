@@ -1,0 +1,15 @@
+%chk=SubH_AttCtN_wb97xd_aug-cc-pvtz.chk
+%nprocs=4
+%mem=3200MB
+#p wb97xd/aug-cc-pvtz opt freq output=wfx
+
+*C#N
+
+0 1
+C -7.589218 -1.084208 -0.423309
+H -6.583127 -0.735158 -0.394400
+N -8.662799 -1.455342 -0.454767
+
+SubH_AttCtN_wb97xd_aug-cc-pvtz.wfx
+
+

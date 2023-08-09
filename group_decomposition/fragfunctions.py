@@ -478,7 +478,8 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
             remove the parent group from output. If False, parent group is retained
         bb_patt: string of SMARTS pattern for bonds to be broken in side chains and linkers
             defaults to cleaving sp3 carbon-((ring OR not sp3 carbon) AND not-placeholder/halogen/H)
-        input_type = 'smile' if SMILES code or 'molfile' if .mol file
+        input_type = 'smile' if SMILES code or 'molfile' if .mol file, or 'xyzfile' if .xyz file
+            Note: xyz file REQUIRES .cml file as well
         cml_file: defaults to none, can be the cml file corresponding to the input .mol file
         include_parent = Boolean. If True, include column in output frame repeating parent molecule
             intended use for True when merging multiple molecule fragment frames but need to retain a parent molecule object
@@ -502,8 +503,13 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
             xyz_coords = utils.xyz_from_cml(cml_file)
         else:
             xyz_coords =mol_dict['xyz_pos']
+    elif input_type == 'xyzfile':
+        if not cml_file:
+            raise ValueError('No cml file provided, expected one for xyz input type')
+        mol_dict = utils.mol_from_xyzfile(xyz_file=input,cml_file=cml_file)
+        mol, atomic_symb, xyz_coords = mol_dict['Molecule'],  mol_dict['atomic_symbols'], mol_dict['xyz_pos']
     else:
-        raise ValueError(f"""{input_type} shold either be molfile or smile""")    
+        raise ValueError(f"""{input_type} should either be molfile, xyzfile, or a smile string""")    
     #assign molecule into parts (Rings, side chains, peripherals)
     if mol.GetRingInfo().NumRings() > 0:
         mol_frame = generate_full_mol_frame(mol,xyz_coords)
@@ -523,9 +529,9 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
     # frag_frame = _add_xyz_coords(frag_frame)
     #count number of placeholders in each fragment - it is the number of places it is attached
     frag_frame = _add_number_attachements(frag_frame)
-    if input_type == 'molfile': #clear map labels and add xyz coordinates that are available
+    if input_type == 'molfile' or input_type == 'xyzfile': #clear map labels and add xyz coordinates that are available
         frag_frame = _add_frag_comp(frag_frame,mol)
-        frag_frame['Smiles'] = frag_frame['Smiles'].map(_clear_map_number)
+        frag_frame['Smiles'] = frag_frame['Smiles'].map(lambda x:_clear_map_number(x))
         frag_frame['xyz'] = frag_frame['Atoms'].map(lambda x:_add_rtr_xyz(x,xyz_coords))
         frag_frame['Labels'] = frag_frame['Atoms'].map(lambda x:_add_rtr_label(x,atomic_symb))
         frag_frame['Molecule'] = frag_frame['Molecule'].map(lambda x:_clear_map_number(x,'mol'))    
@@ -651,14 +657,10 @@ def count_uniques(frag_frame:pd.DataFrame,drop_attachments=False) -> pd.DataFram
     #identify unique smiles and count number of times they occur
     #initialize lists to be used making frame
     unique_smiles=[]
-    if xyz_inc:
-        unique_xyz = []
-    if atoms_inc:
-        unique_atoms = []
-    if labels_inc:
-        unique_labels = []
-    if parent_inc:
-        unique_parents = []
+    unique_xyz = []
+    unique_atoms = []
+    unique_labels = []
+    unique_parents = []
     unique_smiles_counts=[]
     #Identify unique smiles, counting every occurence and adding xyz if included
     for i,smile in enumerate(no_connect_smile):
@@ -677,10 +679,8 @@ def count_uniques(frag_frame:pd.DataFrame,drop_attachments=False) -> pd.DataFram
             smi_ix = unique_smiles.index(smile)
             unique_smiles_counts[smi_ix] += 1
     #create output frame
-    if xyz_inc:
-        un_frame =  _construct_unique_frame(uni_smi=unique_smiles,uni_smi_count=unique_smiles_counts,xyz=unique_xyz)
-    else:
-        un_frame =  _construct_unique_frame(uni_smi=unique_smiles,uni_smi_count=unique_smiles_counts)
+    
+    un_frame =  _construct_unique_frame(uni_smi=unique_smiles,uni_smi_count=unique_smiles_counts,xyz=unique_xyz,atoms=unique_atoms,parents=unique_parents,labels=unique_labels)
     if atoms_inc:
         un_frame['Atoms'] = unique_atoms
     if labels_inc:
@@ -927,11 +927,17 @@ def _find_at_idx(mol,at_list):
     list_idx = at_list.index(at_idx)
     return list_idx
 
-def _construct_unique_frame(uni_smi:list[str],uni_smi_count:list[int],xyz='') -> pd.DataFrame:
+def _construct_unique_frame(uni_smi:list[str],uni_smi_count:list[int],xyz=[],atoms=[],parents=[],labels=[]) -> pd.DataFrame:
     """given smiles, counts and (optional) xyz coordinates, create frame"""
     uniquefrag_frame = pd.DataFrame(uni_smi,columns=['Smiles'])
     if xyz:
         uniquefrag_frame['xyz'] = xyz
+    if atoms:
+        uniquefrag_frame['Atoms'] = atoms
+    if parents:
+        uniquefrag_frame['Parent'] = parents
+    if labels:
+        uniquefrag_frame['Labels'] = labels
     PandasTools.AddMoleculeColumnToFrame(uniquefrag_frame,'Smiles','Molecule',
                                          includeFingerprints=True)
     uniquefrag_frame['count']=uni_smi_count

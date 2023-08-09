@@ -11,6 +11,9 @@ from rdkit import Chem
 from rdkit.Geometry import Point3D
 from rdkit.Chem.Scaffolds import rdScaffoldNetwork # scaffolding
 from rdkit.Chem import rdqueries # search for rdScaffoldAttachment points * to remove
+from rdkit.Chem import rdDetermineBonds
+
+
 
 def find_smallest_rings(node_molecules):
     """Given get_scaffold_vertices list of molecules, remove non-smallest nodes
@@ -88,6 +91,48 @@ def mol_with_atom_index(mol):
             atom.SetAtomMapNum(atom.GetIdx()+1)
     return mol
 
+def _get_charge_from_cml(cml_file):
+    with open(cml_file,"r") as file:
+        for line in file:
+            if "formalCharge" in line:
+                split_line = line.split(" ")
+                for i, word in enumerate(split_line):
+                    if "formalCharge" in word:
+                        charge = int(word.replace("formalCharge=","").replace(">\n","").replace('"',''))
+                        break
+    return charge
+                
+
+def mol_from_xyzfile(xyz_file:str,cml_file):
+    charge = _get_charge_from_cml(cml_file)
+    # raw_mol = Chem.MolFromXYZFile('DUDE_67368827_adrb2_decoys_C19H25N3O4_CIR.xyz')
+    # mol = Chem.Mol(raw_mol)
+    # rdDetermineBonds.DetermineConnectivity(mol)
+    # rdDetermineBonds.DetermineBondOrders(mol)
+    raw_mol = Chem.MolFromXYZFile(xyz_file)
+    mol = Chem.Mol(raw_mol)
+    rdDetermineBonds.DetermineBonds(mol,charge=charge)
+    atomic_symbols = []
+    xyz_coordinates = []
+    ats_read = 0
+    num_atoms= mol.GetNumAtoms()
+    with open(xyz_file, "r") as file:
+        for line_number,line in enumerate(file):
+            if ats_read <  num_atoms and line_number > 1:
+                ats_read += 1
+                atomic_symbol, x, y, z  = line.split()[:4]
+                atomic_symbols.append(atomic_symbol)
+                xyz_coordinates.append([float(x),float(y),float(z)])
+            elif ats_read == num_atoms:
+                break
+    # from https://github.com/rdkit/rdkit/issues/2413
+    # conf = m.GetConformer()
+# in principal, you should check that the atoms match
+    # for i in range(m.GetNumAtoms()):
+    #     print(i)
+    #     x,y,z = xyz_coordinates[i]
+    #     conf.SetAtomPosition(i,Point3D(x,y,z))
+    return {'Molecule': mol_with_atom_index(mol), 'xyz_pos':xyz_coordinates,'atomic_symbols':atomic_symbols}
 
 def mol_from_molfile(mol_file):
     """takes mol_file and returns mol wth atom numbers the same
