@@ -1013,10 +1013,14 @@ def merge_uniques(frame1:pd.DataFrame,frame2:pd.DataFrame) -> pd.DataFrame:
         rows_to_drop = _find_rows_to_drop(frame1,frame2)
         merge_frame = rows_to_drop['merge_frame']
         #TODO simply concat data frames
+        print(rows_to_drop['drop_rows_1'])
+        print(frame1)
         drop_frame_1 = frame1.drop(rows_to_drop['drop_rows_1'])
         drop_frame_2 = frame2.drop(rows_to_drop['drop_rows_2'])
-        merge_frame = _add_frame(drop_frame_1,merge_frame)
-        merge_frame = _add_frame(drop_frame_2,merge_frame)
+        merge_frame = pd.concat([drop_frame_1,drop_frame_2,merge_frame])
+        merge_frame.reset_index(inplace=True,drop=True)
+        # _add_frame(drop_frame_1,merge_frame)
+        # merge_frame = _add_frame(drop_frame_2,merge_frame)
     return merge_frame
 
 def _add_frame(frame1:pd.DataFrame,merge_frame=pd.DataFrame()) -> pd.DataFrame:
@@ -1036,23 +1040,36 @@ def _add_frame(frame1:pd.DataFrame,merge_frame=pd.DataFrame()) -> pd.DataFrame:
         merge_frame = pd.DataFrame()        
     return merge_frame
 
-def _find_rows_to_drop(frame_a:pd.DataFrame,frame_b:pd.DataFrame) -> list[list[int]]:
+def _find_rows_to_drop(frame_a:pd.DataFrame,frame_b:pd.DataFrame):
     """for two frames, find rows with same smile, store what rows to drop in each"""
     rows_to_drop_one = []
     rows_to_drop_two = []
-    made_frame = 0
-    merge_frame = pd.DataFrame()
+    col_names = list(frame_a.columns)
+    merge_frame = pd.DataFrame(columns=col_names)
+    frame_a_idx = list(frame_a.index)
+    frame_b_idx  = list(frame_b.index)
     for i,smi in enumerate(frame_a['Smiles']):
         if smi in list(frame_b['Smiles']):
+            # print(f'i is {i}')
             j=list(frame_b['Smiles']).index(smi)
-            cum_count=frame_a['count'][i] + frame_b['count'][j]
-            if made_frame == 0:
-                merge_frame = pd.DataFrame.from_dict({'Smiles':[smi],'count':[cum_count]})
-                made_frame=1
-            else:
-                merge_frame.loc[len(merge_frame)] = [smi, cum_count]
+            # print(f'j is {j}')
+            # print(frame_a.shape)
+            cum_count=frame_a.at[frame_a_idx[i],'count'] + frame_b.at[frame_b_idx[j],'count']
+            # print('cum_count is {cum_count}')
+            merge_frame = pd.concat([merge_frame,pd.DataFrame([list(frame_a.iloc[frame_a_idx[i]])],columns=col_names)])
+            merge_frame.reset_index(inplace=True,drop=True)
+            # print(f'merge frame before updating cumcount {merge_frame}')
+            # print(merge_frame.shape[0]-1)
+            merge_frame.at[merge_frame.shape[0]-1,'count'] = cum_count
+            # print(f'merge_frame after updating cumcount {merge_frame}')
+            # if made_frame == 0:
+            #     merge_frame = pd.DataFrame.from_dict({'Smiles':[smi],'count':[cum_count]})
+            #     made_frame=1
+            # else:
+            #     merge_frame.loc[len(merge_frame)] = [smi, cum_count]
             rows_to_drop_one.append(i)
             rows_to_drop_two.append(j)
+    print(merge_frame)
     return {'drop_rows_1':rows_to_drop_one,'drop_rows_2':rows_to_drop_two,
             'merge_frame':merge_frame}
 
@@ -1077,7 +1094,6 @@ def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,inp
     Example usage:
         count_groups_in_set(['c1ccc(c(c1)c2ccc(o2)C(=O)N3C[C@H](C4(C3)CC[NH2+]CC4)C(=O)NCCOCCO)F',
         'Cc1nc2ccc(cc2s1)NC(=O)c3cc(ccc3N4CCCC4)S(=O)(=O)N5CCOCC5'],drop_attachments=False)."""
-    i=0
     for i,inp in enumerate(list_of_inputs):
         print(inp)
         if cml_list:
@@ -1086,13 +1102,13 @@ def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,inp
             frame = identify_connected_fragments(inp,bb_patt=bb_patt,input_type=input_type)
         unique_frame = count_uniques(frame,drop_attachments)
         if i==0:
-            i+=1
             out_frame=unique_frame
         else:
             out_frame = merge_uniques(out_frame,unique_frame)
+    out_frame.drop('Molecule',axis=1)
     PandasTools.AddMoleculeColumnToFrame(out_frame,'Smiles','Molecule',includeFingerprints=True)
     #out_frame = _add_xyz_coords(out_frame)
-    out_frame = _add_number_attachements(out_frame)
+    # out_frame = _add_number_attachements(out_frame)
     return out_frame
 
 #old version without connectivity, included here just in case
