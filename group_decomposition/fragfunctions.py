@@ -1097,9 +1097,9 @@ def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,inp
     for i,inp in enumerate(list_of_inputs):
         print(inp)
         if cml_list:
-            frame = identify_connected_fragments(inp,bb_patt=bb_patt,input_type=input_type,cml_file=cml_list[i])
+            frame = identify_connected_fragments(inp,bb_patt=bb_patt,input_type=input_type,cml_file=cml_list[i],include_parent=True)
         else:
-            frame = identify_connected_fragments(inp,bb_patt=bb_patt,input_type=input_type)
+            frame = identify_connected_fragments(inp,bb_patt=bb_patt,input_type=input_type,include_parent=True)
         unique_frame = count_uniques(frame,drop_attachments)
         if i==0:
             out_frame=unique_frame
