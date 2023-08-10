@@ -501,6 +501,7 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
         #use coordinates in cml file provided if able, else use xyz from mol file
         if cml_file:
             xyz_coords = utils.xyz_from_cml(cml_file)
+            atom_types = utils.get_cml_atom_types(cml_file)
         else:
             xyz_coords =mol_dict['xyz_pos']
     elif input_type == 'xyzfile':
@@ -508,6 +509,7 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
             raise ValueError('No cml file provided, expected one for xyz input type')
         mol_dict = utils.mol_from_xyzfile(xyz_file=input,cml_file=cml_file)
         mol, atomic_symb, xyz_coords = mol_dict['Molecule'],  mol_dict['atomic_symbols'], mol_dict['xyz_pos']
+        atom_types = utils.get_cml_atom_types(cml_file)
     else:
         raise ValueError(f"""{input_type} should either be molfile, xyzfile, or a smile string""")    
     #assign molecule into parts (Rings, side chains, peripherals)
@@ -534,9 +536,12 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
         frag_frame['Smiles'] = frag_frame['Smiles'].map(lambda x:_clear_map_number(x))
         frag_frame['xyz'] = frag_frame['Atoms'].map(lambda x:_add_rtr_xyz(x,xyz_coords))
         frag_frame['Labels'] = frag_frame['Atoms'].map(lambda x:_add_rtr_label(x,atomic_symb))
-        frag_frame['Molecule'] = frag_frame['Molecule'].map(lambda x:_clear_map_number(x,'mol'))    
+        frag_frame['Molecule'] = frag_frame['Molecule'].map(lambda x:_clear_map_number(x,'mol'))
+        if cml_file:
+            frag_frame['atom_types'] = frag_frame['Atoms'].map(lambda x:_add_rtr_type(x,atom_types))
     if include_parent:
         frag_frame['Parent'] = [mol] * len(frag_frame.index)
+        frag_frame['Parent'] = frag_frame['Parent'].map(lambda x:_clear_map_number(x,'mol'))
     return frag_frame
 
 def _add_rtr_label(at_num_list,atomic_symb):
@@ -544,6 +549,13 @@ def _add_rtr_label(at_num_list,atomic_symb):
     for atom in at_num_list:
         # out_str + atomic_symbols[atom-1] + '  ' + str(xyz_coords[atom-1][0]) + '  ' + str(xyz_coords[atom-1][1]) + '  ' +  str(xyz_coords[atom-1][2]) + '\n'
         out_list.append(atomic_symb[atom-1])
+    return out_list
+
+def _add_rtr_type(at_num_list,atom_types):
+    out_list = []
+    for atom in at_num_list:
+        # out_str + atomic_symbols[atom-1] + '  ' + str(xyz_coords[atom-1][0]) + '  ' + str(xyz_coords[atom-1][1]) + '  ' +  str(xyz_coords[atom-1][2]) + '\n'
+        out_list.append(atom_types[atom-1])
     return out_list
 
 def _add_rtr_xyz(at_num_list,xyz_coords):

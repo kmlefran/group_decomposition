@@ -12,6 +12,7 @@ from rdkit.Geometry import Point3D
 from rdkit.Chem.Scaffolds import rdScaffoldNetwork # scaffolding
 from rdkit.Chem import rdqueries # search for rdScaffoldAttachment points * to remove
 from rdkit.Chem import rdDetermineBonds
+import pandas as pd
 
 
 
@@ -133,6 +134,27 @@ def mol_from_xyzfile(xyz_file:str,cml_file):
     #     x,y,z = xyz_coordinates[i]
     #     conf.SetAtomPosition(i,Point3D(x,y,z))
     return {'Molecule': mol_with_atom_index(mol), 'xyz_pos':xyz_coordinates,'atomic_symbols':atomic_symbols}
+
+def get_cml_atom_types(cml_file):
+    n_atl = 0
+    type_list = []
+    idx_list = []
+    with open(cml_file, "r") as file:
+        for line_number,line in enumerate(file):
+            if 'atomTypeList' in line:
+                n_atl += 1
+                if n_atl == 2:
+                    break
+            elif n_atl == 1:
+                split_line = line.split()
+                idx_list.append(int(split_line[1].split('=')[1].replace('"','').replace('a',''))-1)
+                at_label = split_line[2].split('=')[1].replace('"','')
+                at_type = int(split_line[3].split('=')[1].replace('"',''))
+                at_valence = int(split_line[4].split('=')[1].split('/')[0].replace('"',''))
+                type_list.append((at_label,at_type,at_valence))
+    temp_frame = pd.DataFrame(list(zip(idx_list,type_list)),columns=['idx','type'])
+    temp_frame.sort_values(by='idx',inplace=True)
+    return list(temp_frame['type'])
 
 def mol_from_molfile(mol_file):
     """takes mol_file and returns mol wth atom numbers the same
