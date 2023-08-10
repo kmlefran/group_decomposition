@@ -1027,8 +1027,8 @@ def merge_uniques(frame1:pd.DataFrame,frame2:pd.DataFrame) -> pd.DataFrame:
         rows_to_drop = _find_rows_to_drop(frame1,frame2)
         merge_frame = rows_to_drop['merge_frame']
         #TODO simply concat data frames
-        print(rows_to_drop['drop_rows_1'])
-        print(frame1)
+        # print(rows_to_drop['drop_rows_1'])
+        # print(frame1)
         drop_frame_1 = frame1.drop(rows_to_drop['drop_rows_1'])
         drop_frame_2 = frame2.drop(rows_to_drop['drop_rows_2'])
         merge_frame = pd.concat([drop_frame_1,drop_frame_2,merge_frame])
@@ -1083,7 +1083,7 @@ def _find_rows_to_drop(frame_a:pd.DataFrame,frame_b:pd.DataFrame):
             #     merge_frame.loc[len(merge_frame)] = [smi, cum_count]
             rows_to_drop_one.append(i)
             rows_to_drop_two.append(j)
-    print(merge_frame)
+    # print(merge_frame)
     return {'drop_rows_1':rows_to_drop_one,'drop_rows_2':rows_to_drop_two,
             'merge_frame':merge_frame}
 
@@ -1110,7 +1110,6 @@ def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,inp
         'Cc1nc2ccc(cc2s1)NC(=O)c3cc(ccc3N4CCCC4)S(=O)(=O)N5CCOCC5'],drop_attachments=False)."""
     out_frame=pd.DataFrame()
     for i,inp in enumerate(list_of_inputs):
-        print(inp)
         if cml_list:
             frame = identify_connected_fragments(inp,bb_patt=bb_patt,input_type=input_type,cml_file=cml_list[i],include_parent=True)
         else:
