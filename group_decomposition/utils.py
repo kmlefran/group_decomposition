@@ -13,6 +13,7 @@ from rdkit.Chem.Scaffolds import rdScaffoldNetwork # scaffolding
 from rdkit.Chem import rdqueries # search for rdScaffoldAttachment points * to remove
 from rdkit.Chem import rdDetermineBonds
 import pandas as pd
+import os
 
 
 
@@ -112,20 +113,33 @@ def mol_from_xyzfile(xyz_file:str,cml_file):
     # rdDetermineBonds.DetermineBondOrders(mol)
     raw_mol = Chem.MolFromXYZFile(xyz_file)
     mol = Chem.Mol(raw_mol)
-    rdDetermineBonds.DetermineBonds(mol,charge=charge)
-    atomic_symbols = []
-    xyz_coordinates = []
-    ats_read = 0
-    num_atoms= mol.GetNumAtoms()
-    with open(xyz_file, "r") as file:
-        for line_number,line in enumerate(file):
-            if ats_read <  num_atoms and line_number > 1:
-                ats_read += 1
-                atomic_symbol, x, y, z  = line.split()[:4]
-                atomic_symbols.append(atomic_symbol)
-                xyz_coordinates.append([float(x),float(y),float(z)])
-            elif ats_read == num_atoms:
-                break
+    try:
+        rdDetermineBonds.DetermineBonds(mol,charge=charge)
+    except:
+        if os.path.isfile('error_log.txt'):
+            er_file = open('error_log.txt','a')
+            er_file.write(f'Could not determine bond orders for {cml_file}')
+            er_file.close()
+        else:
+            er_file = open('error_log.txt','w')
+            er_file.write(f'Could not determine bond orders for {cml_file}')
+            er_file.close()
+        return None
+    else:
+        atomic_symbols = []
+        xyz_coordinates = []
+        ats_read = 0
+        num_atoms= mol.GetNumAtoms()
+        with open(xyz_file, "r") as file:
+            for line_number,line in enumerate(file):
+                if ats_read <  num_atoms and line_number > 1:
+                    ats_read += 1
+                    atomic_symbol, x, y, z  = line.split()[:4]
+                    atomic_symbols.append(atomic_symbol)
+                    xyz_coordinates.append([float(x),float(y),float(z)])
+                elif ats_read == num_atoms:
+                    break
+        return {'Molecule': mol_with_atom_index(mol), 'xyz_pos':xyz_coordinates,'atomic_symbols':atomic_symbols}
     # from https://github.com/rdkit/rdkit/issues/2413
     # conf = m.GetConformer()
 # in principal, you should check that the atoms match
@@ -133,7 +147,7 @@ def mol_from_xyzfile(xyz_file:str,cml_file):
     #     print(i)
     #     x,y,z = xyz_coordinates[i]
     #     conf.SetAtomPosition(i,Point3D(x,y,z))
-    return {'Molecule': mol_with_atom_index(mol), 'xyz_pos':xyz_coordinates,'atomic_symbols':atomic_symbols}
+    
 
 def get_cml_atom_types(cml_file):
     n_atl = 0

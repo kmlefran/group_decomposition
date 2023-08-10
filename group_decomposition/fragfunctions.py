@@ -508,6 +508,8 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
         if not cml_file:
             raise ValueError('No cml file provided, expected one for xyz input type')
         mol_dict = utils.mol_from_xyzfile(xyz_file=input,cml_file=cml_file)
+        if mol_dict is None:
+            return None
         mol, atomic_symb, xyz_coords = mol_dict['Molecule'],  mol_dict['atomic_symbols'], mol_dict['xyz_pos']
         atom_types = utils.get_cml_atom_types(cml_file)
     else:
@@ -1106,17 +1108,19 @@ def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,inp
     Example usage:
         count_groups_in_set(['c1ccc(c(c1)c2ccc(o2)C(=O)N3C[C@H](C4(C3)CC[NH2+]CC4)C(=O)NCCOCCO)F',
         'Cc1nc2ccc(cc2s1)NC(=O)c3cc(ccc3N4CCCC4)S(=O)(=O)N5CCOCC5'],drop_attachments=False)."""
+    out_frame=pd.DataFrame()
     for i,inp in enumerate(list_of_inputs):
         print(inp)
         if cml_list:
             frame = identify_connected_fragments(inp,bb_patt=bb_patt,input_type=input_type,cml_file=cml_list[i],include_parent=True)
         else:
             frame = identify_connected_fragments(inp,bb_patt=bb_patt,input_type=input_type,include_parent=True)
-        unique_frame = count_uniques(frame,drop_attachments)
-        if i==0:
-            out_frame=unique_frame
-        else:
-            out_frame = merge_uniques(out_frame,unique_frame)
+        if frame is not None:
+            unique_frame = count_uniques(frame,drop_attachments)
+            if out_frame.empty:
+                out_frame=unique_frame
+            else:
+                out_frame = merge_uniques(out_frame,unique_frame)
     out_frame.drop('Molecule',axis=1)
     PandasTools.AddMoleculeColumnToFrame(out_frame,'Smiles','Molecule',includeFingerprints=True)
     #out_frame = _add_xyz_coords(out_frame)
