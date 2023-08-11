@@ -118,11 +118,11 @@ def mol_from_xyzfile(xyz_file:str,cml_file):
     except:
         if os.path.isfile('error_log.txt'):
             er_file = open('error_log.txt','a')
-            er_file.write(f'Could not determine bond orders for {cml_file}')
+            er_file.write(f'Could not determine bond orders for {cml_file}\n')
             er_file.close()
         else:
             er_file = open('error_log.txt','w')
-            er_file.write(f'Could not determine bond orders for {cml_file}')
+            er_file.write(f'Could not determine bond orders for {cml_file}\n')
             er_file.close()
         return None
     else:
@@ -170,7 +170,44 @@ def get_cml_atom_types(cml_file):
     temp_frame.sort_values(by='idx',inplace=True)
     return list(temp_frame['type'])
 
-def mol_from_molfile(mol_file):
+def data_from_cml(cml_file):
+    num_atom_array=0
+    geom_list = []
+    n_atl = 0
+    type_list = []
+    idx_list = []
+    with open(cml_file, "r") as file:
+        for line in file:
+            if 'atomArray' in line:
+                num_atom_array += 1
+                if num_atom_array == 5:
+                    continue
+            if num_atom_array == 5:
+                space_split = line.split()
+                x_split = space_split[3].split("=")
+                y_split = space_split[4].split("=")
+                z_split = space_split[5].split("=")
+                geom_list.append([float(eval(x_split[1])),float(eval(y_split[1])), float(eval(z_split[1]))])
+            elif num_atom_array == 6:
+                if 'atomTypeList' in line:
+                    n_atl += 1
+                    if n_atl ==1:
+                        continue
+                    elif n_atl == 2:
+                        break
+                elif n_atl == 1:
+                    split_line = line.split()
+                    idx_list.append(int(split_line[1].split('=')[1].replace('"','').replace('a',''))-1)
+                    at_label = split_line[2].split('=')[1].replace('"','')
+                    at_type = int(split_line[3].split('=')[1].replace('"',''))
+                    at_valence = int(split_line[4].split('=')[1].split('/')[0].replace('"',''))
+                    type_list.append((at_label,at_type,at_valence))
+    temp_frame = pd.DataFrame(list(zip(idx_list,type_list)),columns=['idx','type'])
+    temp_frame.sort_values(by='idx',inplace=True)
+    return [geom_list, list(temp_frame['type'])]
+
+
+def mol_from_molfile(mol_file,inc_xyz=False):
     """takes mol_file and returns mol wth atom numbers the same
     #modified for mol file structure from retrievium
     from stackexchange https://mattermodeling.stackexchange.com/questions/7234/how-to-input-3d-coordinates-from-xyz-file-and-connectivity-from-smiles-in-rdkit"""

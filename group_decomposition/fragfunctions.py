@@ -21,6 +21,8 @@ import numpy as np #for arrays in fragment identification
 sys.path.append(sys.path[0].replace('/src',''))
 from group_decomposition import utils
 
+_num_bonds_broken = 1
+
 _H_BOND_LENGTHS = {
     #from Gaussview default cleaned bond length
     'C':1.07,
@@ -334,17 +336,17 @@ def _add_number_attachements(frag_frame):
     frag_frame['numAttachments'] = attach_list
     return frag_frame
 
-def generate_full_mol_frame(mol1,xyz_coords=[]) -> pd.DataFrame:
+def generate_full_mol_frame(mol,xyz_coords=[]) -> pd.DataFrame:
     """Generate data frame for molecule assigning all atoms to rings/linkers/peripherals."""
-    mol1nodemols = utils.get_scaffold_vertices(mol1)
-    ring_frags = utils.find_smallest_rings(mol1nodemols)
-    mol_frame = _initialize_molecule_frame(mol1,xyz_coords)
-    ring_atom_indices = _identify_ring_atom_index(mol1,ring_frags)
+    molnodemols = utils.get_scaffold_vertices(mol)
+    ring_frags = utils.find_smallest_rings(molnodemols)
+    mol_frame = _initialize_molecule_frame(mol,xyz_coords)
+    ring_atom_indices = _identify_ring_atom_index(mol,ring_frags)
     ring_indices_nosubset = _remove_subset_rings(ring_atom_indices)
     mol_frame = _assign_rings_to_mol_frame(ring_indices_nosubset,mol_frame)
     mol_frame = _set_double_bonded_in_ring(mol_frame)
-    mol_frame = _set_hydrogens_in_ring(mol_frame,mol1)
-    mol_frame = _assign_side_and_linkers(mol_frame,mol1)
+    mol_frame = _set_hydrogens_in_ring(mol_frame,mol)
+    mol_frame = _assign_side_and_linkers(mol_frame,mol)
     return mol_frame
 
 def _set_hydrogens_in_ring(mol_frame,mol):
@@ -387,45 +389,58 @@ def _trim_molpart(mol_frame,mol_part_lst,molecule):
         new_smi.append(Chem.MolToSmiles(Chem.MolFromSmiles(split)))
     return {'smiles':new_smi, 'count':count}
 
+def _break_part_bonds(molecule,bonds_to_break):
+    global _num_bonds_broken
+    # molecule = Chem.MolFromSmiles(partsmi)
+    if molecule.GetRingInfo().NumRings() == 0: #don't do this for rings
+        #break sp3 carbon to ring/heteroatom bonds
+        # bonds_to_break = molecule.GetSubstructMatches(Chem.MolFromSmarts(patt))
+        #iterate over matches, storing bond index, and the dummy atom labels to be used in a
+        # list
+        bonds = [molecule.GetBondBetweenAtoms(x[0],x[1]).GetIdx() for x in bonds_to_break]
+        # print(bonds)
+        labels = [[x,x] for x in range(_num_bonds_broken,_num_bonds_broken+len(bonds))]
+        _num_bonds_broken += len(bonds)
+        #implemented list comprehension. Comment above 2 and uncomment below 4 to change back
+        # for bond in bonds_to_break:
+        #     b_obj = molecule.GetBondBetweenAtoms(bond[0],bond[1])
+        #     bonds.append(b_obj.GetIdx())
+        #     labels.append([count,count])
+            #all dummy atom labels will be different for different bond breaking
+            # count  = count+1
+        if bonds:
+            # print(labels)
+            frag_mol = Chem.FragmentOnBonds(molecule,bondIndices=bonds,dummyLabels=labels)
+            #FragmentOnBonds returns SMILES with fragments separated by .,
+            #  get each fragment in its own string in a list
+            #WORK HERE
+            split_smiles  = Chem.MolToSmiles(frag_mol).split('.')
+            return split_smiles
+        else:
+            return
+            # for split in split_smiles:
+            #     #store canonical fragment smiles in new list
+            #     new_smi.append(Chem.MolToSmiles(Chem.MolFromSmiles(split)))
+    else:
+        return
 
 def _break_molparts(mol_part_smi,count,drop_parent = True,
                     patt = '[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35,!#1]):2]'):
     """For a given list of Smiles of the molecule parts, break non-ring groups into 
     Ertl functional groups and (halo)alkyl groups."""
-    el_to_rm = []
-    new_smi=[]
-    for i,partsmi in enumerate(mol_part_smi):
-        molecule = Chem.MolFromSmiles(partsmi)
-        if molecule.GetRingInfo().NumRings() == 0: #don't do this for rings
-            #break sp3 carbon to ring/heteroatom bonds
-            bonds_to_break = molecule.GetSubstructMatches(Chem.MolFromSmarts(patt))
-            bonds = []
-            labels = []
-            #iterate over matches, storing bond index, and the dummy atom labels to be used in a
-            # list
-            for bond in bonds_to_break:
-                b_obj = molecule.GetBondBetweenAtoms(bond[0],bond[1])
-                bonds.append(b_obj.GetIdx())
-                labels.append([count,count])
-                #all dummy atom labels will be different for different bond breaking
-                count  = count+1
-            if bonds:
-                el_to_rm.append(i)
-                frag_mol = Chem.FragmentOnBonds(molecule,bondIndices=bonds,dummyLabels=labels)
-                #FragmentOnBonds returns SMILES with fragments separated by .,
-                #  get each fragment in its own string in a list
-                split_smiles  = Chem.MolToSmiles(frag_mol).split('.')
-                for split in split_smiles:
-                    #store canonical fragment smiles in new list
-                    new_smi.append(Chem.MolToSmiles(Chem.MolFromSmiles(split)))
+    num_parts = len(mol_part_smi)
+    #list of lists
+    #TODO maybe update to dictionary comprehension?
+    mol_list = list(map(Chem.MolFromSmiles, mol_part_smi))
+    p_mol = Chem.MolFromSmarts(patt)
+    matches = [x.GetSubstructMatches(p_mol) for x in mol_list]
+    new_smi_ll=[_break_part_bonds(mol_list[x],matches[x]) for x in range(0,num_parts)]
+    tmp = [i for i in new_smi_ll if i is not None]
+    new_smi = [smi for group in tmp for smi in group]
     if drop_parent:
-        el_to_rm = sorted(el_to_rm,reverse=True)
-        for rm_el in el_to_rm:
-            #if the molPart was broken apart, remove it from the output
-            # so each atom is uniquely assigned
-            del mol_part_smi[rm_el]
-    out_smi  = mol_part_smi + new_smi #this is the Smiles of all fragments in the molecule
-    return out_smi
+        el_to_rm = [i for i in range(0,num_parts) if matches[i]]
+        link_chain_smi = [mol_part_smi[x] for x in range(0,num_parts) if x not in el_to_rm]
+    return link_chain_smi + new_smi
 
 def generate_acyclic_mol_frame(molecule, xyz_coords=[]):
     """Create simple mol_frame, with molPart as Acyclic and all inRing=False"""
@@ -496,12 +511,12 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
         mol = utils.get_canonical_molecule(input)
         xyz_coords=[]
     elif input_type == 'molfile':
-        mol_dict = utils.mol_from_molfile(input)
-        mol, atomic_symb = mol_dict['Molecule'],  mol_dict['atomic_symbols']
         #use coordinates in cml file provided if able, else use xyz from mol file
+        mol_dict = utils.mol_from_molfile(input,inc_xyz=False)
+        mol, atomic_symb = mol_dict['Molecule'],  mol_dict['atomic_symbols']
         if cml_file:
-            xyz_coords = utils.xyz_from_cml(cml_file)
-            atom_types = utils.get_cml_atom_types(cml_file)
+            xyz_coords, atom_types = utils.data_from_cml(cml_file)
+            # atom_types = utils.get_cml_atom_types(cml_file)
         else:
             xyz_coords =mol_dict['xyz_pos']
     elif input_type == 'xyzfile':
