@@ -719,7 +719,18 @@ def mol_from_cml(cml_file):
     bond_mol.UpdatePropertyCache()
     Chem.GetSymmSSSR(bond_mol) # need rings for aromaticity check
     Chem.SanitizeMol(bond_mol)
-    return [mol_with_atom_index(bond_mol),el_list,xyz_coords,at_types]
+    if bond_mol:
+        return [mol_with_atom_index(bond_mol),el_list,xyz_coords,at_types]
+    else:
+        if os.path.isfile('error_log.txt'):
+            er_file = open('error_log.txt','a')
+            er_file.write(f'No match between template smiles and connected geom for {cml_file}\n')
+            er_file.close()
+        else:
+            er_file = open('error_log.txt','w')
+            er_file.write(f'No match between template smiles and connected geom for {cml_file}\n')
+            er_file.close()
+        return [None,None,None,None]
 
 def modAssignBondOrdersFromTemplate(refmol, mol):
   """ This is originally from RDKit AllChem module. 
@@ -835,7 +846,7 @@ Resume original documentation:
       if hasattr(mol2, '__sssAtoms'):
         mol2.__sssAtoms = None  # we don't want all bonds highlighted
     else:
-      raise ValueError("No matching found")
+      return None
   return mol2
 
 # def remove_a_bond(rwmol,ex_b_dict):

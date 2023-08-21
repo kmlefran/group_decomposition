@@ -608,6 +608,8 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
         xyz_coords=[]
     elif input_type == 'cmlfile':
         mol,atomic_symb,xyz_coords,atom_types =  utils.mol_from_cml(input)
+        if mol is None:
+            return None
     elif input_type == 'molfile':
         #use coordinates in cml file provided if able, else use xyz from mol file
         mol_dict = utils.mol_from_molfile(input,inc_xyz=False)
@@ -627,6 +629,8 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
         atom_types = utils.get_cml_atom_types(cml_file)
     else:
         raise ValueError(f"""{input_type} should either be molfile, xyzfile, cmlfile, or a smile string""")    
+ 
+        
     #assign molecule into parts (Rings, side chains, peripherals)
     # if mol.GetRingInfo().NumRings() > 0:
     #     mol_frame, mol_parts = generate_full_molframe_v2(mol,xyz_coords)
