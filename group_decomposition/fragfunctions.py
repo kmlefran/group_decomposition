@@ -840,7 +840,7 @@ def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,inp
         drop_attachments: Boolean for whether or not to drop attachment points from fragments
             if True, will remove all placeholder atoms indicating connectivity
             if False, placeholder atoms will remain
-        input_type: smile or molfile, based on elements of lists_of_inputs
+        input_type: smile, xyzfile, cmlfile or molfile, based on elements of lists_of_inputs
         cml_list = defaults empty, but can be a list of cml files corresponding to the molfile inputs
         #bb_patt = SMARTS pattern for bonds to break in linkers and side chains. Defaults to breaking 
             bonds between nonring carbons with four bonds single bonded to ring atoms or carbons that don't have four bonds, and are not H, halide, or placeholder
@@ -862,7 +862,7 @@ def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,inp
         else:
             frame = identify_connected_fragments(inp,bb_patt=bb_patt,input_type=input_type,include_parent=True)
         if frame is not None:
-            unique_frame = count_uniques(frame,drop_attachments,uni_smi_ty=True)
+            unique_frame = count_uniques(frame,drop_attachments,uni_smi_type=True)
             if out_frame.empty:
                 out_frame=unique_frame
             else:

@@ -168,14 +168,9 @@ def add_cml_single_atoms_bonds(el_list,bond_list):
     
     Adjust bonds after with modAssignBondOrdersFromTemplate"""
     flag=1
+    rwmol = Chem.RWMol(Chem.Mol())
     for atom in el_list:
-        if flag:
-            mol = Chem.MolFromSmiles(atom)
-            rwmol = Chem.RWMol(mol)
-            rwmol.BeginBatchEdit()
-            flag=0
-        else:
-            rwmol.AddAtom(Chem.Atom(atom))
+        rwmol.AddAtom(Chem.Atom(atom))
     #mw.AddBond(6,7,Chem.BondType.SINGLE)
     for bond in bond_list:
         rwmol.AddBond(bond[0]-1,bond[1]-1,Chem.BondType.SINGLE)
@@ -222,25 +217,48 @@ def mol_from_cml(cml_file):
     smile = smiles_from_cml(cml_file)
     rwmol2 = Chem.RemoveHs(rwmol,implicitOnly=True,updateExplicitCount=False)
     template = AllChem.MolFromSmiles(smile)
-    bond_mol = modAssignBondOrdersFromTemplate(template,rwmol2)
-    bond_mol.UpdatePropertyCache()
-    Chem.GetSymmSSSR(bond_mol) # need rings for aromaticity check
-    Chem.SanitizeMol(bond_mol)
+    bond_mol = modAssignBondOrdersFromTemplate(template,rwmol2,cml_file)
+     # need rings for aromaticity check
+        # if os.path.isfile('error_log.txt'):
+        #     er_file = open('error_log.txt','a')
+        #     er_file.write(f'Could not sanitize {cml_file}\n')
+        #     er_file.close()
+        # else:
+        #     er_file = open('error_log.txt','w')
+        #     er_file.write(f'Could not sanitize {cml_file}\n')
+        #     er_file.close()
     if bond_mol:
+        bond_mol.UpdatePropertyCache()
+        Chem.GetSymmSSSR(bond_mol)
+        try:
+            Chem.SanitizeMol(bond_mol)
+        except:
+            write_error(f'Could not sanitize {cml_file}\n')
+            return [None,None,None,None]
         return [mol_with_atom_index(bond_mol),el_list,xyz_coords,at_types]
-    #if no match, return None, write error
     else:
-        if os.path.isfile('error_log.txt'):
-            er_file = open('error_log.txt','a')
-            er_file.write(f'No match between template smiles and connected geom for {cml_file}\n')
-            er_file.close()
-        else:
-            er_file = open('error_log.txt','w')
-            er_file.write(f'No match between template smiles and connected geom for {cml_file}\n')
-            er_file.close()
+        # if os.path.isfile('error_log.txt'):
+        #     er_file = open('error_log.txt','a')
+        #     er_file.write(f'No match between template smiles and connected geom for {cml_file}\n')
+        #     er_file.close()
+        # else:
+        #     er_file = open('error_log.txt','w')
+        #     er_file.write(f'No match between template smiles and connected geom for {cml_file}\n')
+        #     er_file.close()
         return [None,None,None,None]
 
-def modAssignBondOrdersFromTemplate(refmol, mol):
+def write_error(errormessage):
+    if os.path.isfile('error_log.txt'):
+        er_file = open('error_log.txt','a')
+        er_file.write(errormessage)
+        er_file.close()
+    else:
+        er_file = open('error_log.txt','w')
+        er_file.write(errormessage)
+        er_file.close()
+    return
+
+def modAssignBondOrdersFromTemplate(refmol, mol,cml_file):
   """ This is originally from RDKit AllChem module. 
   Modified here by Kevin Lefrancois-Gagnon(KLG) to disallow implicit hydrogens on all
   molcule objects used. This corresponds to the 4 for loops after creation of mol
@@ -352,12 +370,47 @@ Resume original documentation:
         a2.SetIsAromatic(a.GetIsAromatic())
         a2.SetNumExplicitHs(a.GetNumExplicitHs())
         a2.SetFormalCharge(a.GetFormalCharge())
-      Chem.SanitizeMol(mol2)
+      try:
+        Chem.SanitizeMol(mol2)
+      except:
+        er_message = f'Could not sanitize {cml_file}\n'
+        # smile = smiles_from_cml(cml_file)
+        er_message += at_num_er(refmol2,mol2)
+        # smimol = Chem.MolFromSmiles()
+        write_error(er_message)
+        return None
       if hasattr(mol2, '__sssAtoms'):
         mol2.__sssAtoms = None  # we don't want all bonds highlighted
     else:
+      er_message = f'No match between template smiles and connected geom for {cml_file}\n'
+      er_message += at_num_er(refmol2,mol2)
+      write_error(er_message)
       return None
   return mol2
+
+def at_num_er(refmol2,mol2):
+    er_message = ''
+    smi_num = []
+    smi_lab = []
+    symb_list=[]
+    num_list=[]
+    for atom in mol2.GetAtoms():
+        if atom.GetSymbol() not in symb_list:
+            symb_list.append(atom.GetSymbol())
+            num_list.append(1)
+        else:
+            num_list[symb_list.index(atom.GetSymbol())] += 1
+    for atom in refmol2.GetAtoms():
+        if atom.GetSymbol() not in smi_lab:
+            smi_lab.append(atom.GetSymbol())
+            smi_num.append(1)
+        else:
+            smi_num[smi_lab.index(atom.GetSymbol())] += 1
+    for i in range(0,len(num_list)):
+        j = smi_lab.index(symb_list[i])
+        if smi_num[j] != num_list[i]:
+            er_message += f'Expected {smi_num[j]} {smi_lab[j]} from SMILES, observed {num_list[i]} in xyz\n'
+    return er_message
 
 def data_from_cml(cml_file,bonds=False):
     """Gets symbols, xyz coords, bonds and charge of a mol from cml file"""
