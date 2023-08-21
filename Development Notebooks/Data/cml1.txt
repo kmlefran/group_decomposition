@@ -1,16 +1,5 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<module convention="convention:compchem"
-xmlns="http://www.xml-cml.org/schema"
-xmlns:cmlx="http://www.xml-cml.org/schema/cmlx"
-xmlns:convention="http://www.xml-cml.org/convention/"
-xmlns:cml="http://www.xml-cml.org/dictionary/cml/"
-xmlns:compchem="http://www.xml-cml.org/dictionary/compchem/"
-xmlns:cc="http://www.xml-cml.org/dictionary/compchem/"
-xmlns:si="http://www.xml-cml.org/unit/si/"
-xmlns:nonSI="http://www.xml-cml.org/unit/nonSI/"
-xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-xmlns:retrievium="http://www.retrievium.com/dictionary/"
-xmlns:mungauss="http://www.retrievium.com/mungauss/">
+<?xml version='1.0' encoding='UTF-8'?>
+<module xmlns="http://www.xml-cml.org/schema" xmlns:cmlx="http://www.xml-cml.org/schema/cmlx" convention="convention:compchem" xmlns:="http://www.xml-cml.org/schema" xmlns:cmlx="http://www.xml-cml.org/schema/cmlx" xmlns:convention="http://www.xml-cml.org/convention/" xmlns:cml="http://www.xml-cml.org/dictionary/cml/" xmlns:compchem="http://www.xml-cml.org/dictionary/compchem/" xmlns:cc="http://www.xml-cml.org/dictionary/compchem/" xmlns:si="http://www.xml-cml.org/unit/si/" xmlns:nonSI="http://www.xml-cml.org/unit/nonSI/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:retrievium="http://www.retrievium.com/dictionary/" xmlns:mungauss="http://www.retrievium.com/mungauss/">
 <module dictRef="cc:CMLInfo">
 <propertyList>
 <property dictRef="cc:CMLVersion">
