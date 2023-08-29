@@ -6,3 +6,13 @@ Expected 2 S from SMILES, observed 2 in xyz
 Expected 24 H from SMILES, observed 26 in xyz
 Could not sanitize Data/DUDE_39835855_ital_decoys_C26H26N3O5S2_CIR.cml
 Expected 24 H from SMILES, observed 26 in xyz
+Could not sanitize Data/DUDE_39835855_ital_decoys_C26H26N3O5S2_CIR.cml
+Expected 24 H from SMILES, observed 26 in xyz
+Could not sanitize Data/DUDE_39835855_ital_decoys_C26H26N3O5S2_CIR.cml
+Expected 24 H from SMILES, observed 26 in xyz
+Could not sanitize Data/DUDE_39835855_ital_decoys_C26H26N3O5S2_CIR.cml
+Expected 24 H from SMILES, observed 26 in xyz
+Could not sanitize Data/DUDE_39835855_ital_decoys_C26H26N3O5S2_CIR.cml
+Expected 24 H from SMILES, observed 26 in xyz
+Could not sanitize Data/DUDE_39835855_ital_decoys_C26H26N3O5S2_CIR.cml
+Expected 24 H from SMILES, observed 26 in xyz

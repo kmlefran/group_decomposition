@@ -552,6 +552,62 @@ def _clean_molecule_name(smile):
     smile = smile.replace('@','')
     return smile
 
+def generate_fragment_structures(input: str,keep_only_children:bool=True,
+            bb_patt:str='[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35;!#1]):2]',
+            input_type = 'smile',cml_file='',include_parent=True):
+    frag_frame = identify_connected_fragments(input=input,keep_only_children=keep_only_children,
+                                              bb_patt=bb_patt,input_type=input_type,
+                                              cml_file=cml_file,include_parent=include_parent)
+    mol = frag_frame.at[0,'Parent']
+    frag_dict = output_ifc_dict(mol,frag_frame)
+    return frag_dict
+
+def output_ifc_dict(mol,frag_frame):
+    on_at_frame  = pd.DataFrame(frag_frame[frag_frame['numAttachments']==1])
+    col_names = list(on_at_frame.columns)
+    #Find indices of relevant columns
+    xyz_idx = col_names.index('xyz')
+    atoms_idx = col_names.index('Atoms')
+    #Find H xyz position and index of atom bonded to H
+    on_at_frame['H_xyz'] = on_at_frame.apply(lambda row : _find_H_xyz(mol, row[atoms_idx],row[xyz_idx],frag_frame),axis=1)
+    on_at_frame['at_idx'] = on_at_frame.apply(lambda row : _find_at_idx(mol,row[atoms_idx]),axis=1)
+    hxyz = len(col_names)
+    atidx = len(col_names)+1
+    nrow = on_at_frame.shape[0]
+    on_at_frame = on_at_frame.reset_index(drop=True)
+    print(on_at_frame)
+    # print(_clean_molecule_name(on_at_frame.at[0,'Smiles']))
+    print(on_at_frame.at[0,'Molecule'])
+    print(on_at_frame.at[0,'Labels'])
+    print(on_at_frame.at[0,'xyz'])
+    print(on_at_frame.at[0,'H_xyz'])
+    print(on_at_frame.at[0,'at_idx'])
+    print(on_at_frame.at[0,'atom_types'])
+
+    out_dict = {re.sub('\[[0-9]+\*\]', '*',on_at_frame.at[i,'Smiles']): _write_frag_structure(frag_mol=on_at_frame.at[i,'Molecule'],xyz_list=on_at_frame.at[i,'xyz'],symb_list=on_at_frame.at[i,'Labels'],h_xyz=on_at_frame.at[i,'H_xyz'],at_idx=on_at_frame.at[i,'at_idx'],atom_types=frag_frame.at[i,'atom_types']) for i in range(0,nrow)}
+    # on_at_frame.apply(lambda row : _write_frag_structure(frag_mol=row[mol_idx],xyz_list=row[xyz_idx],symb_list=row[labels_idx],h_xyz=row[hxyz],at_idx=row[atidx]))
+    return out_dict
+                      
+def _write_frag_structure(frag_mol, xyz_list, symb_list,h_xyz,at_idx,atom_types):
+    print('in function')
+    num_atoms = len(symb_list)
+    # smile = re.sub('\[[0-9]+\*\]', '*', Chem.MolToSmiles(frag_mol,canonical=False))
+    charge = Chem.GetFormalCharge(frag_mol)
+    # molecule_name = _clean_molecule_name(smile)
+    # print(at_idx)
+    # print(xyz_list[at_idx])
+    # print(h_xyz)
+    #build xyz of molecule
+    out_xyz = [xyz_list[at_idx],h_xyz]
+    for i in range(num_atoms):
+        if i != at_idx:
+            out_xyz.append(xyz_list[i])
+    # geom_frame = pd.DataFrame(out_xyz,columns=['x','y','z'])
+    symb_list.insert(1,'H')
+    # geom_frame['Atom'] = symb_list
+    # geom_frame = geom_frame[['Atom','x','y','z']]
+    return {'geom':out_xyz,'charge':charge,'atom_types':atom_types,'atom_symbols':symb_list}
+
 def output_ifc_gjf(mol,frag_frame,esm='wb97xd',basis_set='aug-cc-pvtz',wfx=True,n_procs=4,mem='3200MB',multiplicity=1):
     """ Takes a fragmented molecule and outputs gjf files of the fragments with one
     attachment point. Hydrogen is added in place of the connection to the rest of
@@ -866,16 +922,6 @@ def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,inp
         count_groups_in_set(['c1ccc(c(c1)c2ccc(o2)C(=O)N3C[C@H](C4(C3)CC[NH2+]CC4)C(=O)NCCOCCO)F',
         'Cc1nc2ccc(cc2s1)NC(=O)c3cc(ccc3N4CCCC4)S(=O)(=O)N5CCOCC5'],drop_attachments=False)."""
     
-    if aiida:
-        t_list = [x.value for x  in list_of_inputs]
-        list_of_inputs = t_list
-        drop_attachments = drop_attachments.value
-        input_type = input_type.value
-        bb_patt = bb_patt.value
-        if cml_list:
-            u_list = [x.value for x in cml_list]
-            cml_list = u_list
-        uni_smi_ty = uni_smi_ty.value
     out_frame=pd.DataFrame()
     for i,inp in enumerate(list_of_inputs):
         print(inp)
@@ -889,8 +935,9 @@ def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,inp
                 out_frame=unique_frame
             else:
                 out_frame = merge_uniques(out_frame,unique_frame,uni_smi_ty)
-    out_frame.drop('Molecule',axis=1)
-    PandasTools.AddMoleculeColumnToFrame(out_frame,'Smiles','Molecule',includeFingerprints=True)
+    out_frame = out_frame.drop('Molecule',axis=1)
+    if not aiida:
+        PandasTools.AddMoleculeColumnToFrame(out_frame,'Smiles','Molecule',includeFingerprints=True)
     #out_frame = _add_xyz_coords(out_frame)
     # out_frame = _add_number_attachements(out_frame)
     return out_frame
