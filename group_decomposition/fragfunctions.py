@@ -120,7 +120,7 @@ def generate_molecule_fragments(mol,patt='[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;
 
 def identify_connected_fragments(input: str,keep_only_children:bool=True,
             bb_patt:str='[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35;!#1]):2]',
-            input_type = 'smile',cml_file='',include_parent=False) -> pd.DataFrame:
+            input_type = 'smile',cml_file='',include_parent=False,aiida=False) -> pd.DataFrame:
     """
     Given Smiles string, identify fragments in the molecule as follows:
     Break all ring-non-ring atom single bonds
@@ -149,6 +149,15 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
     Notes: currently will break apart a functional group if contains a ring-non-ring single bond.
     e.g. ring N-nonring S=O -> ring N-[1*] nonring S=O-[1*]    
     """
+    if aiida:
+        input = input.value
+        keep_only_children = keep_only_children.value
+        bb_patt = bb_patt.value
+        input_type = input_type.value
+        if cml_file:
+            cml_file = cml_file.value
+        include_parent = include_parent.value
+
     #ensure smiles is canonical so writing and reading the smiles will result in same number
     # ordering of atoms
     if input_type == 'smile':
@@ -832,7 +841,7 @@ def _find_rows_to_drop(frame_a:pd.DataFrame,frame_b:pd.DataFrame,uni_smi_ty=True
             'merge_frame':merge_frame}
 
 
-def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,input_type='smile',bb_patt= '[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35;!#1]):2]',cml_list=[],uni_smi_ty=True) -> pd.DataFrame:
+def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,input_type='smile',bb_patt= '[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35;!#1]):2]',cml_list=[],uni_smi_ty=True,aiida=False) -> pd.DataFrame:
     """Identify unique fragments in molecules defined in the list_of_smiles, 
     and count the number of occurences for duplicates.
     Args:
@@ -854,6 +863,17 @@ def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,inp
     Example usage:
         count_groups_in_set(['c1ccc(c(c1)c2ccc(o2)C(=O)N3C[C@H](C4(C3)CC[NH2+]CC4)C(=O)NCCOCCO)F',
         'Cc1nc2ccc(cc2s1)NC(=O)c3cc(ccc3N4CCCC4)S(=O)(=O)N5CCOCC5'],drop_attachments=False)."""
+    
+    if aiida:
+        t_list = [x.value for x  in list_of_inputs]
+        list_of_inputs = t_list
+        drop_attachments = drop_attachments.value
+        input_type = input_type.value
+        bb_patt = bb_patt.value
+        if cml_list:
+            u_list = [x.value for x in cml_list]
+            cml_list = u_list
+        uni_smi_ty = uni_smi_ty.value
     out_frame=pd.DataFrame()
     for i,inp in enumerate(list_of_inputs):
         print(inp)
