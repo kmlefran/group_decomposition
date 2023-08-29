@@ -221,7 +221,7 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
         frag_frame['Parent'] = [mol] * len(frag_frame.index)
         # frag_frame['Parent'] = frag_frame['Parent'].map(lambda x:_clear_map_number(x,'mol'))
     if aiida:
-        frag_frame.drop('Molecule',axis=1)
+        frag_frame = frag_frame('Molecule',axis=1)
     return frag_frame
 
 def _add_rtr_label(at_num_list,atomic_symb):
