@@ -474,6 +474,73 @@ def data_from_cml(cml_file,bonds=False):
     else:
         return [geom_list, list(temp_frame['type'])]
 
+def all_data_from_cml(cml_file,bonds=False):
+    """Gets symbols, xyz coords, bonds and charge of a mol from cml file"""
+    num_atom_array=0
+    geom_list = []
+    n_atl = 0
+    n_bary = 0
+    type_list = []
+    idx_list = []
+    bond_list = []
+    el_list = []
+    smi_flag=0
+    with open(cml_file, "r") as file:
+        for line in file:
+            if "formalCharge" in line:
+                split_line = line.split(" ")
+                for i, word in enumerate(split_line):
+                    if "spinMultiplicity" in word:
+                        multiplicity = int(word.replace("spinMultiplicity=").replace('"',''))
+                    if "formalCharge" in word:
+                        charge = int(word.replace("formalCharge=","").replace(">\n","").replace('"',''))
+                        continue
+            if 'retrievium:inputSMILES' in line:
+                smi_flag=1
+            elif smi_flag==1:
+                smile = line.split('>')[1].split('<')[0]
+                smi_flag=2
+            if 'atomArray' in line:
+                num_atom_array += 1
+                if num_atom_array == 5:
+                    continue
+            if num_atom_array == 5:
+                quote_split = line.split('"')
+                #maybe only do el_list with bonds?
+                el_list.append(quote_split[3])
+                x_split = quote_split[5]
+                y_split = quote_split[7]
+                z_split = quote_split[9]
+                geom_list.append([float(eval(x_split)),float(eval(y_split)), float(eval(z_split))])
+            elif num_atom_array == 6:               
+                if 'bondArray' in line:
+                    n_bary+=1
+                    if n_bary ==1 or n_bary==2:
+                        continue
+                elif n_bary == 1:
+                    split_line = line.split()
+                    at_1 = int(split_line[1].split('"')[1].replace('a',''))
+                    at_2 = int(split_line[2].replace('"','').replace('a',''))
+                    b_ord = split_line[4].split('"')[1]
+                    bond_list.append((at_1,at_2,b_ord))
+                if 'atomTypeList' in line:
+                    n_atl += 1
+                    if n_atl ==1:
+                        continue
+                    elif n_atl == 2:
+                        break
+                elif n_atl == 1:
+                    split_line = line.split()
+                    idx_list.append(int(split_line[1].split('=')[1].replace('"','').replace('a',''))-1)
+                    at_label = split_line[2].split('=')[1].replace('"','')
+                    at_type = int(split_line[3].split('=')[1].replace('"',''))
+                    at_valence = int(split_line[4].split('=')[1].split('/')[0].replace('"',''))
+                    type_list.append((at_label,at_type,at_valence))
+    temp_frame = pd.DataFrame(list(zip(idx_list,type_list)),columns=['idx','type'])
+    temp_frame.sort_values(by='idx',inplace=True)
+    
+    return {'geom':geom_list, 'atom_types':list(temp_frame['type']),'bonds':bond_list,'labels':el_list,'charge':charge,'multiplicity':multiplicity,'smiles':smile}
+
 
 def mol_from_molfile(mol_file,inc_xyz=False):
     """takes mol_file and returns mol wth atom numbers the same
