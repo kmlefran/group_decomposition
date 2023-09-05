@@ -500,7 +500,7 @@ def all_data_from_cml(data):
             split_line = line.split(" ")
             for i, word in enumerate(split_line):
                 if "spinMultiplicity" in word:
-                    multiplicity = int(word.replace("spinMultiplicity=").replace('"',''))
+                    multiplicity = int(word.replace("spinMultiplicity=","").replace('"',''))
                 if "formalCharge" in word:
                     charge = int(word.replace("formalCharge=","").replace(">\n","").replace('"',''))
                     continue
