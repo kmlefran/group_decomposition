@@ -208,7 +208,7 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
     # frag_frame = _add_xyz_coords(frag_frame)
     #count number of placeholders in each fragment - it is the number of places it is attached
     frag_frame = _add_number_attachements(frag_frame)
-    if input_type == 'molfile' or input_type == 'xyzfile' or input_type == 'cmlfile': #clear map labels and add xyz coordinates that are available
+    if input_type == 'molfile' or input_type == 'xyzfile' or input_type == 'cmlfile' or input_type == 'cmldict': #clear map labels and add xyz coordinates that are available
         frag_frame = _add_frag_comp(frag_frame,mol)
         frag_frame['Smiles'] = frag_frame['Smiles'].map(lambda x:_clear_map_number(x))
         frag_frame['xyz'] = frag_frame['Atoms'].map(lambda x:_add_rtr_xyz(x,xyz_coords))
