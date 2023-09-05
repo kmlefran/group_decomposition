@@ -214,7 +214,7 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
         frag_frame['xyz'] = frag_frame['Atoms'].map(lambda x:_add_rtr_xyz(x,xyz_coords))
         frag_frame['Labels'] = frag_frame['Atoms'].map(lambda x:_add_rtr_label(x,atomic_symb))
         frag_frame['Molecule'] = frag_frame['Molecule'].map(lambda x:_clear_map_number(x,'mol'))
-        if cml_file or input_type=='cmlfile':
+        if cml_file or input_type=='cmlfile' or input_type=='cmldict':
             frag_frame['atom_types'] = frag_frame['Atoms'].map(lambda x:_add_rtr_type(x,atom_types))
     if include_parent and not aiida:
         mol = _clear_map_number(mol,'mol')
