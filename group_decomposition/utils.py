@@ -502,7 +502,7 @@ def all_data_from_cml(data):
                 if "spinMultiplicity" in word:
                     multiplicity = int(word.replace("spinMultiplicity=","").replace('"',''))
                 if "formalCharge" in word:
-                    charge = int(word.replace("formalCharge=","").replace(">\n","").replace('"',''))
+                    charge = int(word.replace("formalCharge=","").replace('"','').replace(">\n",""))
                     continue
         if 'retrievium:inputSMILES' in line:
             smi_flag=1
