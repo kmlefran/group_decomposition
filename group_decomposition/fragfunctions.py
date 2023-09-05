@@ -163,8 +163,8 @@ def identify_connected_fragments(input: str,keep_only_children:bool=True,
     if input_type == 'smile':
         mol = utils.get_canonical_molecule(input)
         xyz_coords=[]
-    elif input_type == 'cmlfile':
-        mol,atomic_symb,xyz_coords,atom_types =  utils.mol_from_cml(input)
+    elif input_type == 'cmlfile' or input_type=='cmldict':
+        mol,atomic_symb,xyz_coords,atom_types =  utils.mol_from_cml(input,input_type=input_type)
         if mol is None:
             return None
     elif input_type == 'molfile':
