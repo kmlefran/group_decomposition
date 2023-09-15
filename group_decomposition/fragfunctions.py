@@ -562,12 +562,25 @@ def generate_fragment_structures(input: str,keep_only_children:bool=True,
     frag_dict = output_ifc_dict(mol,frag_frame)
     return frag_dict
 
+def output_cgis_dicts(cgis_frame):
+    #should have parent col
+    on_at_frame  = pd.DataFrame(cgis_frame[cgis_frame['numAttachments']==1])
+    col_names = list(on_at_frame.columns)
+    xyz_idx = col_names.index('xyz')
+    atoms_idx = col_names.index('Atoms')
+    parent_idx = col_names.index('Parent')
+    on_at_frame['H_xyz'] = on_at_frame.apply(lambda row : _find_H_xyz(row[parent_idx], row[atoms_idx],row[xyz_idx],cgis_frame),axis=1)
+    on_at_frame['at_idx'] = on_at_frame.apply(lambda row : _find_at_idx(row[parent_idx],row[atoms_idx]),axis=1)   
+    out_dict = {re.sub('\[[0-9]+\*\]', '*',on_at_frame.at[i,'Smiles']): _write_frag_structure(frag_mol=on_at_frame.at[i,'Molecule'],xyz_list=on_at_frame.at[i,'xyz'],symb_list=on_at_frame.at[i,'Labels'],h_xyz=on_at_frame.at[i,'H_xyz'],at_idx=on_at_frame.at[i,'at_idx'],atom_types=frag_frame.at[i,'atom_types']) for i in range(0,nrow)}
+    return out_dict
+
 def output_ifc_dict(mol,frag_frame):
     on_at_frame  = pd.DataFrame(frag_frame[frag_frame['numAttachments']==1])
     col_names = list(on_at_frame.columns)
     #Find indices of relevant columns
     xyz_idx = col_names.index('xyz')
     atoms_idx = col_names.index('Atoms')
+    
     #Find H xyz position and index of atom bonded to H
     on_at_frame['H_xyz'] = on_at_frame.apply(lambda row : _find_H_xyz(mol, row[atoms_idx],row[xyz_idx],frag_frame),axis=1)
     on_at_frame['at_idx'] = on_at_frame.apply(lambda row : _find_at_idx(mol,row[atoms_idx]),axis=1)
@@ -897,7 +910,6 @@ def _find_rows_to_drop(frame_a:pd.DataFrame,frame_b:pd.DataFrame,uni_smi_ty=True
     # print(merge_frame)
     return {'drop_rows_1':rows_to_drop_one,'drop_rows_2':rows_to_drop_two,
             'merge_frame':merge_frame}
-
 
 def count_groups_in_set(list_of_inputs:list[str],drop_attachments:bool=False,input_type='smile',bb_patt= '[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35;!#1]):2]',cml_list=[],uni_smi_ty=True,aiida=False) -> pd.DataFrame:
     """Identify unique fragments in molecules defined in the list_of_smiles, 
