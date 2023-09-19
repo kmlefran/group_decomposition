@@ -16,8 +16,6 @@ import pandas as pd
 import os
 from rdkit.RDLogger import logger
 
-
-
 def get_molecules_atomicnum(molecule):
     """Given molecule object, get list of atomic numbers."""
     atom_num_list = []
@@ -552,7 +550,7 @@ def all_data_from_cml(data):
 #show 
 
 def xyz_list_to_str(xyz_list):
-    a = 'foobar'
+    a = 'foo2'
     outstr=''
     for row in xyz_list:
         for at in row:
