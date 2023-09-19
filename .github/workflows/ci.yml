@@ -1,0 +1,67 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+        aiida-version: ["stable"]
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install python dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -e .[testing]
+        pip install git+https://kmlefran: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@github.com/kmlefran/subproptools
+
+    - name: Run test suite
+      env:
+        # show timings of tests
+        PYTEST_ADDOPTS: "--durations=0"
+      run: pytest --cov aiida_aimall --cov-append .
+
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.11"
+    - name: Install python dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -e .[docs]
+        pip install git+https://kmlefran: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@github.com/kmlefran/subproptools
+    - name: Build docs
+      run: cd docs && make
+
+  pre-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.11"
+    - name: Install python dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -e .[pre-commit,docs,testing]
+    - name: Run pre-commit
+      run: |
+        pre-commit install
+        pre-commit run --all-files || ( git status --short ; git diff ; exit 1 )

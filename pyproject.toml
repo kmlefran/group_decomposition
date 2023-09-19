@@ -1,0 +1,112 @@
+[build-system]
+# build the package with [flit](https://flit.readthedocs.io)
+requires = ["flit_core >=3.4,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+# See https://www.python.org/dev/peps/pep-0621/
+name = "subproptools"
+dynamic = ["version"] # read from subproptools/__init__.py
+description = "A plugin for extracting data from .sum files and manipuating them"
+authors = [{name = "Kevin Lefrancois-Gagnon", email = "kgagnon@lakeheadu.ca"}, {name = "Robert Mawhinney", email = "mawhinn@lakeheadu.ca"}]
+readme = "README.md"
+license = {file = "LICENSE"}
+classifiers = [
+    "Programming Language :: Python",
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.11',
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Development Status :: 3 - Alpha",
+    "Framework :: AiiDA"
+]
+keywords = ["qtaim", "functional groups"]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "pandas",
+    "rdkit"
+]
+
+[project.urls]
+Source = "https://github.com/kmlefran/subproptools"
+[project.optional-dependencies]
+testing = [
+    "pgtest~=1.3.1",
+    "wheel~=0.31",
+    "coverage[toml]",
+    "pytest~=6.0",
+    "pytest-cov",
+    "rdkit"
+]
+pre-commit = [
+    "pre-commit~=2.2",
+    "pylint~=2.15.10"
+]
+docs = [
+    "sphinx",
+    "sphinxcontrib-contentui",
+    "sphinxcontrib-details-directive",
+    "furo",
+    "markupsafe<2.1",
+    "pandas",
+    "numpy",
+    "rdkit"
+]
+
+[tool.flit.module]
+name = "subproptools"
+
+[tool.pylint.format]
+max-line-length = 125
+
+[tool.pylint.messages_control]
+disable = [
+    "too-many-ancestors",
+    "invalid-name",
+    "duplicate-code",
+]
+
+[tool.pytest.ini_options]
+# Configuration for [pytest](https://docs.pytest.org)
+python_files = "test_*.py"
+filterwarnings = [
+    "ignore::DeprecationWarning:yaml:",
+]
+
+[tool.coverage.run]
+# Configuration of [coverage.py](https://coverage.readthedocs.io)
+# reporting which lines of your plugin are covered by tests
+source=["subproptools"]
+
+[tool.isort]
+# Configuration of [isort](https://isort.readthedocs.io)
+line_length = 120
+force_sort_within_sections = true
+sections = ['FUTURE', 'STDLIB', 'THIRDPARTY', 'FIRSTPARTY', 'LOCALFOLDER']
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+envlist = py311
+
+[testenv]
+usedevelop=True
+
+[testenv:py{37,38,39,310,311}]
+description = Run the test suite against a python version
+extras = testing
+commands = pytest {posargs}
+
+[testenv:pre-commit]
+description = Run the pre-commit checks
+extras = pre-commit
+commands = pre-commit run {posargs}
+
+[testenv:docs]
+description = Build the documentation
+extras = docs
+commands = sphinx-build -nW --keep-going -b html {posargs} docs/source docs/build/html
+commands_post = echo "open file://{toxinidir}/docs/build/html/index.html"
+"""
