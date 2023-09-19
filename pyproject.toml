@@ -5,8 +5,8 @@ build-backend = "flit_core.buildapi"
 
 [project]
 # See https://www.python.org/dev/peps/pep-0621/
-name = "subproptools"
-dynamic = ["version"] # read from subproptools/__init__.py
+name = "group_decomposition"
+dynamic = ["version"] # read from group_decomposition/__init__.py
 description = "A plugin for extracting data from .sum files and manipuating them"
 authors = [{name = "Kevin Lefrancois-Gagnon", email = "kgagnon@lakeheadu.ca"}, {name = "Robert Mawhinney", email = "mawhinn@lakeheadu.ca"}]
 readme = "README.md"
@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.urls]
-Source = "https://github.com/kmlefran/subproptools"
+Source = "https://github.com/kmlefran/group_decomposition"
 [project.optional-dependencies]
 testing = [
     "pgtest~=1.3.1",
@@ -56,7 +56,7 @@ docs = [
 ]
 
 [tool.flit.module]
-name = "subproptools"
+name = "group_decomposition"
 
 [tool.pylint.format]
 max-line-length = 125
@@ -78,7 +78,7 @@ filterwarnings = [
 [tool.coverage.run]
 # Configuration of [coverage.py](https://coverage.readthedocs.io)
 # reporting which lines of your plugin are covered by tests
-source=["subproptools"]
+source=["group_decomposition"]
 
 [tool.isort]
 # Configuration of [isort](https://isort.readthedocs.io)
