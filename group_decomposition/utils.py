@@ -552,6 +552,7 @@ def all_data_from_cml(data):
 #show 
 
 def xyz_list_to_str(xyz_list):
+    a = 'foo'
     outstr=''
     for row in xyz_list:
         for at in row:
