@@ -549,6 +549,7 @@ def all_data_from_cml(data):
     temp_frame.sort_values(by='idx',inplace=True)
     
     return {'geom':geom_list, 'atom_types':list(temp_frame['type']),'bonds':bond_list,'labels':el_list,'charge':charge,'multiplicity':multiplicity,'smiles':smile}
+#show 
 
 def xyz_list_to_str(xyz_list):
     outstr=''

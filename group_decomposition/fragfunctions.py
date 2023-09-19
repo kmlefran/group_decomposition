@@ -561,6 +561,7 @@ def generate_fragment_structures(input: str,keep_only_children:bool=True,
     mol = frag_frame.at[0,'Parent']
     frag_dict = output_ifc_dict(mol,frag_frame)
     return frag_dict
+#show
 
 def output_cgis_dicts(cgis_frame):
     #should have parent col
