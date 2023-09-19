@@ -19,10 +19,7 @@ import rdkit
 from rdkit import Chem
 from rdkit.Chem import AllChem, PandasTools, rdqueries  # used for 3d coordinates
 from rdkit.Chem.Scaffolds import rdScaffoldNetwork  # scaffolding
-
-sys.path.append(sys.path[0].replace("/src", ""))
 from collections import Counter
-
 from group_decomposition import utils
 
 _num_bonds_broken = 1
@@ -87,7 +84,8 @@ def _add_number_attachements(frag_frame):
 
 
 def fragment_molecule(mol_list, patt, exld_ring=False, drop_parent=True):
-    global _num_bonds_broken
+    """Break molecules into fragments based on fragmenting pattern"""
+    global _num_bonds_broken # pylint:disable=global-statement
     out_mols = []
     pat_mol = Chem.MolFromSmarts(patt)
     # print(mol_list)
@@ -227,19 +225,6 @@ def identify_connected_fragments(
             f"""{input_type} should either be molfile, xyzfile, cmlfile, or a smile string"""
         )
 
-    # assign molecule into parts (Rings, side chains, peripherals)
-    # if mol.GetRingInfo().NumRings() > 0:
-    #     mol_frame, mol_parts = generate_full_molframe_v2(mol,xyz_coords)
-    #     fragment_smiles = _trim_molpart(mol_frame,mol_frame['molPart'].unique(),mol)
-    # else:
-    #     mol_frame = generate_acyclic_mol_frame(mol,xyz_coords)
-    #     fragment_smiles = {'smiles':[Chem.MolToSmiles(mol)],'count':1}
-    # break molecule into fragments defined by the unique parts in mol_frame (Ring 1, Peripheral 1,
-    #  Linker 1, Linker 2, etc.)
-
-    # break side chains and linkers into Ertl functional groups and alkyl chains
-    # full_smi = _break_molparts(fragment_smiles['smiles'],fragment_smiles['count']
-    #    ,drop_parent=keep_only_children,patt=bb_patt)
     mol_frags = generate_molecule_fragments(
         mol, patt=bb_patt, drop_parent=keep_only_children
     )
@@ -282,7 +267,6 @@ def identify_connected_fragments(
 def _add_rtr_label(at_num_list, atomic_symb):
     out_list = []
     for atom in at_num_list:
-        # out_str + atomic_symbols[atom-1] + '  ' + str(xyz_coords[atom-1][0]) + '  ' + str(xyz_coords[atom-1][1]) + '  ' +  str(xyz_coords[atom-1][2]) + '\n'
         out_list.append(atomic_symb[atom - 1])
     return out_list
 
@@ -290,7 +274,6 @@ def _add_rtr_label(at_num_list, atomic_symb):
 def _add_rtr_type(at_num_list, atom_types):
     out_list = []
     for atom in at_num_list:
-        # out_str + atomic_symbols[atom-1] + '  ' + str(xyz_coords[atom-1][0]) + '  ' + str(xyz_coords[atom-1][1]) + '  ' +  str(xyz_coords[atom-1][2]) + '\n'
         out_list.append(atom_types[atom - 1])
     return out_list
 
@@ -299,7 +282,6 @@ def _add_rtr_xyz(at_num_list, xyz_coords):
     """Construct string of atomSymbol x y z format, for use to map to frag_frame"""
     out_list = []
     for atom in at_num_list:
-        # out_str + atomic_symbols[atom-1] + '  ' + str(xyz_coords[atom-1][0]) + '  ' + str(xyz_coords[atom-1][1]) + '  ' +  str(xyz_coords[atom-1][2]) + '\n'
         out_list.append(xyz_coords[atom - 1])
     return out_list
 
@@ -381,7 +363,8 @@ def count_uniques(
     attachments will not count as being the same.
     e.g. ortho-attached aromatics would not match with meta or para attached aromatics
 
-    If you've ran this previously with uni_smi_type=True, running on the output frame (or other frame derived from such frame)
+    If you've ran this previously with uni_smi_type=True, running on the output frame
+    (or other frame derived from such frame)
     with uni_smi_type=False will collapse the output uniques determined by SMILE only
     """
     col_names = list(frag_frame.columns)
@@ -734,8 +717,6 @@ def output_ifc_dict(mol, frag_frame, done_smi):
                 at_idx=on_at_frame.at[i, "at_idx"],
                 atom_types=frag_frame.at[i, "atom_types"],
             )
-    # out_dict = {re.sub('\[[0-9]+\*\]', '*',on_at_frame.at[i,'Smiles']): _write_frag_structure(frag_mol=on_at_frame.at[i,'Molecule'],xyz_list=on_at_frame.at[i,'xyz'],symb_list=on_at_frame.at[i,'Labels'],h_xyz=on_at_frame.at[i,'H_xyz'],at_idx=on_at_frame.at[i,'at_idx'],atom_types=frag_frame.at[i,'atom_types']) for i in range(0,nrow)}
-    # on_at_frame.apply(lambda row : _write_frag_structure(frag_mol=row[mol_idx],xyz_list=row[xyz_idx],symb_list=row[labels_idx],h_xyz=row[hxyz],at_idx=row[atidx]))
     return [out_dict, done_smi]
 
 
@@ -1056,9 +1037,6 @@ def merge_uniques(
     else:
         rows_to_drop = _find_rows_to_drop(frame1, frame2, uni_smi_ty)
         merge_frame = rows_to_drop["merge_frame"]
-        # TODO simply concat data frames
-        # print(rows_to_drop['drop_rows_1'])
-        # print(frame1)
         drop_frame_1 = frame1.drop(rows_to_drop["drop_rows_1"])
         drop_frame_2 = frame2.drop(rows_to_drop["drop_rows_2"])
         merge_frame = pd.concat([drop_frame_1, drop_frame_2, merge_frame])
@@ -1146,7 +1124,8 @@ def count_groups_in_set(
         input_type: smile, xyzfile, cmlfile or molfile, based on elements of lists_of_inputs
         cml_list = defaults empty, but can be a list of cml files corresponding to the molfile inputs
         #bb_patt = SMARTS pattern for bonds to break in linkers and side chains. Defaults to breaking
-            bonds between nonring carbons with four bonds single bonded to ring atoms or carbons that don't have four bonds, and are not H, halide, or placeholder
+            bonds between nonring carbons with four bonds single bonded to ring atoms or carbons that
+            don't have four bonds, and are not H, halide, or placeholder
         uni_smi_type = boolean - if True, include atom types in determination of unique
         fragments. If false, only determine unique by SMILES
     Returns:
