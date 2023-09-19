@@ -574,7 +574,7 @@ def output_cgis_dicts(cgis_frame):
     out_dict = {re.sub('\[[0-9]+\*\]', '*',on_at_frame.at[i,'Smiles']): _write_frag_structure(frag_mol=on_at_frame.at[i,'Molecule'],xyz_list=on_at_frame.at[i,'xyz'],symb_list=on_at_frame.at[i,'Labels'],h_xyz=on_at_frame.at[i,'H_xyz'],at_idx=on_at_frame.at[i,'at_idx'],atom_types=frag_frame.at[i,'atom_types']) for i in range(0,nrow)}
     return out_dict
 
-def output_ifc_dict(mol,frag_frame):
+def output_ifc_dict(mol,frag_frame,done_smi):
     on_at_frame  = pd.DataFrame(frag_frame[frag_frame['numAttachments']==1])
     col_names = list(on_at_frame.columns)
     #Find indices of relevant columns
@@ -597,9 +597,16 @@ def output_ifc_dict(mol,frag_frame):
     print(on_at_frame.at[0,'at_idx'])
     print(on_at_frame.at[0,'atom_types'])
 
-    out_dict = {re.sub('\[[0-9]+\*\]', '*',on_at_frame.at[i,'Smiles']): _write_frag_structure(frag_mol=on_at_frame.at[i,'Molecule'],xyz_list=on_at_frame.at[i,'xyz'],symb_list=on_at_frame.at[i,'Labels'],h_xyz=on_at_frame.at[i,'H_xyz'],at_idx=on_at_frame.at[i,'at_idx'],atom_types=frag_frame.at[i,'atom_types']) for i in range(0,nrow)}
+    out_dict={}
+    for i in range(0,nrow):
+        smi = on_at_frame.at[i,'Smiles']
+        if smi not in done_smi:
+            done_smi.append(smi)
+            key=re.sub('\[[0-9]+\*\]', '*',smi)
+            out_dict[key] = _write_frag_structure(frag_mol=on_at_frame.at[i,'Molecule'],xyz_list=on_at_frame.at[i,'xyz'],symb_list=on_at_frame.at[i,'Labels'],h_xyz=on_at_frame.at[i,'H_xyz'],at_idx=on_at_frame.at[i,'at_idx'],atom_types=frag_frame.at[i,'atom_types'])
+    # out_dict = {re.sub('\[[0-9]+\*\]', '*',on_at_frame.at[i,'Smiles']): _write_frag_structure(frag_mol=on_at_frame.at[i,'Molecule'],xyz_list=on_at_frame.at[i,'xyz'],symb_list=on_at_frame.at[i,'Labels'],h_xyz=on_at_frame.at[i,'H_xyz'],at_idx=on_at_frame.at[i,'at_idx'],atom_types=frag_frame.at[i,'atom_types']) for i in range(0,nrow)}
     # on_at_frame.apply(lambda row : _write_frag_structure(frag_mol=row[mol_idx],xyz_list=row[xyz_idx],symb_list=row[labels_idx],h_xyz=row[hxyz],at_idx=row[atidx]))
-    return out_dict
+    return [out_dict, done_smi]
                       
 def _write_frag_structure(frag_mol, xyz_list, symb_list,h_xyz,at_idx,atom_types):
     print('in function')
