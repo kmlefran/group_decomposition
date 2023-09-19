@@ -562,7 +562,7 @@ def xyz_list_to_str(xyz_list):
 def list_to_str(lst):
     out_str = ''
     for it in lst:
-        out_str += it
+        out_str += str(it)
     return out_str
 
 def mol_from_molfile(mol_file,inc_xyz=False):
