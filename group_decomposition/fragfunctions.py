@@ -565,7 +565,7 @@ def generate_fragment_structures(input: str,keep_only_children:bool=True,
 
 def output_cgis_dicts(cgis_frame):
     #should have parent col
-    a = 'foo'
+    a = 'foobarr'
     on_at_frame  = pd.DataFrame(cgis_frame[cgis_frame['numAttachments']==1])
     col_names = list(on_at_frame.columns)
     xyz_idx = col_names.index('xyz')
