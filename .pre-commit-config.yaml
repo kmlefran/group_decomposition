@@ -29,6 +29,7 @@ repos:
 - repo: local
   hooks:
   - id: pylint
+    args: ["--extension-pkg-allow-list", "rdkit"]
     language: system
     types: [file, python]
     name: pylint

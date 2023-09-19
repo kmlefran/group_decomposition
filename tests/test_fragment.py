@@ -1,7 +1,6 @@
 import sys
 
 sys.path.append(sys.path[0].replace("/tests", ""))
-import pandas as pd
 import pytest
 
 from group_decomposition.fragfunctions import (
@@ -40,6 +39,7 @@ def test_phenyl_in_smi():
 
 
 def test_ring_frag_contains_atoms_doublebonded_to_ring():
+    """Test that """
     frag_frame = identify_connected_fragments(
         "c1c(cnc(c1C(=O)N[C@@H]2CCS(=O)(=O)C2)NN)Br"
     )
