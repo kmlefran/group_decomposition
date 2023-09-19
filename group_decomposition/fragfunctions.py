@@ -12,6 +12,7 @@ import math
 import os
 import re
 import sys
+from collections import Counter
 
 import numpy as np  # for arrays in fragment identification
 import pandas as pd  # lots of work with data frames
@@ -19,7 +20,7 @@ import rdkit
 from rdkit import Chem
 from rdkit.Chem import AllChem, PandasTools, rdqueries  # used for 3d coordinates
 from rdkit.Chem.Scaffolds import rdScaffoldNetwork  # scaffolding
-from collections import Counter
+
 from group_decomposition import utils
 
 _num_bonds_broken = 1
@@ -85,7 +86,7 @@ def _add_number_attachements(frag_frame):
 
 def fragment_molecule(mol_list, patt, exld_ring=False, drop_parent=True):
     """Break molecules into fragments based on fragmenting pattern"""
-    global _num_bonds_broken # pylint:disable=global-statement
+    global _num_bonds_broken  # pylint:disable=global-statement
     out_mols = []
     pat_mol = Chem.MolFromSmarts(patt)
     # print(mol_list)
