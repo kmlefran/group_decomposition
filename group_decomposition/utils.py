@@ -555,9 +555,15 @@ def xyz_list_to_str(xyz_list):
     for row in xyz_list:
         for at in row:
             outstr += str(at)
+            outstr += ', '
         outstr += '\n'
     return outstr
 
+def list_to_str(lst):
+    out_str = ''
+    for it in lst:
+        out_str += it
+    return out_str
 
 def mol_from_molfile(mol_file,inc_xyz=False):
     """takes mol_file and returns mol wth atom numbers the same
