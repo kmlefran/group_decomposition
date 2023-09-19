@@ -550,6 +550,14 @@ def all_data_from_cml(data):
     
     return {'geom':geom_list, 'atom_types':list(temp_frame['type']),'bonds':bond_list,'labels':el_list,'charge':charge,'multiplicity':multiplicity,'smiles':smile}
 
+def xyz_list_to_str(xyz_list):
+    outstr=''
+    for row in xyz_list:
+        for at in row:
+            outstr += str(at)
+        outstr += '\n'
+    return outstr
+
 
 def mol_from_molfile(mol_file,inc_xyz=False):
     """takes mol_file and returns mol wth atom numbers the same
