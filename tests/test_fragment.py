@@ -1,13 +1,15 @@
+"""Tests that fragmenting is as expected"""
 import sys
 
-sys.path.append(sys.path[0].replace("/tests", ""))
 import pytest
 
 from group_decomposition.fragfunctions import (
-    count_groups_in_set,
     count_uniques,
     identify_connected_fragments,
 )
+
+sys.path.append(sys.path[0].replace("/tests", ""))
+
 
 # import unittest
 
@@ -23,6 +25,7 @@ def test_two_ethyls_in_smile():
 
 def test_invalid_smiles_raises_ValueError():
     """Given an invalid smiles, we should see a ValueError"""
+    # a
     with pytest.raises(ValueError):
         identify_connected_fragments("CBx")
 
@@ -35,7 +38,7 @@ def test_phenyl_in_smi():
     unique_frame = count_uniques(frag_frame)
     frag_smiles = list(unique_frame["Smiles"])
     phenyl_in_frag = "*c1ccccc1" in frag_smiles
-    assert phenyl_in_frag == True
+    assert phenyl_in_frag is True
 
 
 def test_ring_frag_contains_atoms_doublebonded_to_ring():
@@ -46,16 +49,18 @@ def test_ring_frag_contains_atoms_doublebonded_to_ring():
     unique_frame = count_uniques(frag_frame)
     frag_smiles = list(unique_frame["Smiles"])
     double_bonded_ring_in_frag = "*[C@@H]1CCS(=O)(=O)C1" in frag_smiles
-    assert double_bonded_ring_in_frag == True
+    assert double_bonded_ring_in_frag is True
 
 
 def test_acyclic_molecule_is_fragmented():
+    """Test that fragments are generated for acyclic molecules"""
     frag_frame = identify_connected_fragments("CCC=O")
     num_frags = len(frag_frame.index)
     assert num_frags == 2
 
 
 def test_two_phenyl_counted_same_if_drop_attachements():
+    """Test that multiple phenyls are counted with different attachment points"""
     frag_frame = identify_connected_fragments("c1cc(ccc1O)Oc2c(ccc(c2F)F)[N+](=O)[O-]")
     unique_frame = count_uniques(frag_frame, drop_attachments=True)
     num_phenyl = list(unique_frame[unique_frame["Smiles"] == "c1ccccc1"]["count"])[0]
