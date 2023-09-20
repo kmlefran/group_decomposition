@@ -62,7 +62,7 @@ def _add_xyz_coords(frag_frame):
         AllChem.EmbedMolecule(h_mol_rw)
         AllChem.MMFFOptimizeMolecule(h_mol_rw)  # Optimize with MMFF94
         xyz_block_list.append(
-            AllChem.rdmolfiles.MolToXYZBlock(h_mol_rw)
+            AllChem.rdmolfiles.MolToXYZBlock(h_mol_rw)  # pylint:disable=no-member
         )  # Store xyz coordinates
     frag_frame["xyz"] = xyz_block_list
     return frag_frame
@@ -203,7 +203,7 @@ def identify_connected_fragments(
             return None
     elif input_type == "molfile":
         # use coordinates in cml file provided if able, else use xyz from mol file
-        mol_dict = utils.mol_from_molfile(inp, inc_xyz=False)
+        mol_dict = utils.mol_from_molfile(inp)
         mol, atomic_symb = mol_dict["Molecule"], mol_dict["atomic_symbols"]
         if cml_file:
             xyz_coords, atom_types, _, _, _ = utils.data_from_cml(cml_file)
