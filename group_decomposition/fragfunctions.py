@@ -8,18 +8,16 @@ identify_connected_fragments - takes one molecule SMILES, returns fragments with
 count_uniques - takes output from above, removes attachments and counts unique fragments
 count_groups_in_set - takes list of SMILES and counts unique fragments on set
 """
+# pylint:disable=too-many-lines
 import math
 import os
 import re
-import sys
 from collections import Counter
 
 import numpy as np  # for arrays in fragment identification
 import pandas as pd  # lots of work with data frames
-import rdkit
-from rdkit import Chem
-from rdkit.Chem import AllChem, PandasTools, rdqueries  # used for 3d coordinates
-from rdkit.Chem.Scaffolds import rdScaffoldNetwork  # scaffolding
+from rdkit import Chem  # pylint:disable=import-error
+from rdkit.Chem import AllChem, PandasTools, rdqueries  # pylint:disable=import-error
 
 from group_decomposition import utils
 
@@ -118,6 +116,7 @@ def fragment_molecule(mol_list, patt, exld_ring=False, drop_parent=True):
 
 
 def get_num_placeholders(mol):
+    """Find number of * in a molecule"""
     n_p = 0
     for atom in mol.GetAtoms():
         if atom.GetAtomicNum() == 0:
@@ -130,21 +129,21 @@ def generate_molecule_fragments(
     patt="[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35;!#1]):2]",
     drop_parent=False,
 ):
+    """Fragment a molecule, first breaking ring-nonring single bonds,
+    single bonds to atoms double bodned to ring
+     Then generate alkyl groups"""
     first_break = fragment_molecule([mol], patt="[!#0;R:1]-!@[!#0;!#1:2]")
     second_break = fragment_molecule(
         first_break, patt="[$([!#0;!R]=[!#0;R]):1]-[!#0;!#1;!R:2]"
     )
-    # print(second_break)
-    # mol_frame = _initialize_mol_frame_v2(mol,second_break,xyz_coords)
     third_break = fragment_molecule(
         second_break, patt, exld_ring=True, drop_parent=drop_parent
     )
     return third_break
-    # third_break = fragment_molecule(second_break,patt=patt,exld_ring=True)
 
 
 def identify_connected_fragments(
-    input: str,
+    inp: str,
     keep_only_children: bool = True,
     bb_patt: str = "[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35;!#1]):2]",
     input_type="smile",
@@ -180,8 +179,10 @@ def identify_connected_fragments(
     Notes: currently will break apart a functional group if contains a ring-non-ring single bond.
     e.g. ring N-nonring S=O -> ring N-[1*] nonring S=O-[1*]
     """
+    # pylint:disable=too-many-arguments
+    # pylint:disable=too-many-branches
     if aiida:
-        input = input.value
+        inp = inp.value
         keep_only_children = keep_only_children.value
         bb_patt = bb_patt.value
         input_type = input_type.value
@@ -192,27 +193,27 @@ def identify_connected_fragments(
     # ensure smiles is canonical so writing and reading the smiles will result in same number
     # ordering of atoms
     if input_type == "smile":
-        mol = utils.get_canonical_molecule(input)
+        mol = utils.get_canonical_molecule(inp)
         xyz_coords = []
-    elif input_type == "cmlfile" or input_type == "cmldict":
+    elif input_type in ["cmlfile", "cmldict"]:
         mol, atomic_symb, xyz_coords, atom_types = utils.mol_from_cml(
-            input, input_type=input_type
+            inp, input_type=input_type
         )
         if mol is None:
             return None
     elif input_type == "molfile":
         # use coordinates in cml file provided if able, else use xyz from mol file
-        mol_dict = utils.mol_from_molfile(input, inc_xyz=False)
+        mol_dict = utils.mol_from_molfile(inp, inc_xyz=False)
         mol, atomic_symb = mol_dict["Molecule"], mol_dict["atomic_symbols"]
         if cml_file:
-            xyz_coords, atom_types = utils.data_from_cml(cml_file)
+            xyz_coords, atom_types, _, _, _ = utils.data_from_cml(cml_file)
             # atom_types = utils.get_cml_atom_types(cml_file)
         else:
             xyz_coords = mol_dict["xyz_pos"]
     elif input_type == "xyzfile":
         if not cml_file:
             raise ValueError("No cml file provided, expected one for xyz input type")
-        mol_dict = utils.mol_from_xyzfile(xyz_file=input, cml_file=cml_file)
+        mol_dict = utils.mol_from_xyzfile(xyz_file=inp, cml_file=cml_file)
         if mol_dict is None:
             return None
         mol, atomic_symb, xyz_coords = (
@@ -235,14 +236,16 @@ def identify_connected_fragments(
     # frag_frame = _add_xyz_coords(frag_frame)
     # count number of placeholders in each fragment - it is the number of places it is attached
     frag_frame = _add_number_attachements(frag_frame)
-    if (
-        input_type == "molfile"
-        or input_type == "xyzfile"
-        or input_type == "cmlfile"
-        or input_type == "cmldict"
-    ):  # clear map labels and add xyz coordinates that are available
+    if input_type in [
+        "molfile",
+        "xyzfile",
+        "cmlfile",
+        "cmldict",
+    ]:  # clear map labels and add xyz coordinates that are available
         frag_frame = _add_frag_comp(frag_frame, mol)
-        frag_frame["Smiles"] = frag_frame["Smiles"].map(lambda x: _clear_map_number(x))
+        frag_frame["Smiles"] = frag_frame["Smiles"].map(
+            _clear_map_number
+        )  # (lambda x: _clear_map_number(x))
         frag_frame["xyz"] = frag_frame["Atoms"].map(
             lambda x: _add_rtr_xyz(x, xyz_coords)
         )
@@ -259,7 +262,6 @@ def identify_connected_fragments(
     if include_parent and not aiida:
         mol = _clear_map_number(mol, "mol")
         frag_frame["Parent"] = [mol] * len(frag_frame.index)
-        # frag_frame['Parent'] = frag_frame['Parent'].map(lambda x:_clear_map_number(x,'mol'))
     if aiida:
         frag_frame = frag_frame.drop("Molecule", axis=1)
     return frag_frame
@@ -290,7 +292,7 @@ def _add_rtr_xyz(at_num_list, xyz_coords):
 def _clear_map_number(mol_input, ret_type="smi"):
     """Given str or Chem.Molecule input, remove atomMapnumbers from atoms and return
     smiles (ret_type='smi') or molecule object (ret_type = 'mol')"""
-    if type(mol_input) == str:
+    if isinstance(mol_input, str):
         mol = Chem.MolFromSmiles(mol_input)
     else:
         mol = mol_input
@@ -302,10 +304,9 @@ def _clear_map_number(mol_input, ret_type="smi"):
         atom.ClearProp("molAtomMapNumber")
     if ret_type == "smi":
         return Chem.MolToSmiles(mol)
-    elif ret_type == "mol":
+    if ret_type == "mol":
         return mol
-    else:
-        raise ValueError(f"""Invalid ret_type, expected smi or mol, got {ret_type}""")
+    raise ValueError(f"""Invalid ret_type, expected smi or mol, got {ret_type}""")
 
 
 def _get_atlabels_in_frag(molecule):
@@ -368,6 +369,10 @@ def count_uniques(
     (or other frame derived from such frame)
     with uni_smi_type=False will collapse the output uniques determined by SMILE only
     """
+    # Change column indices to dict
+    # pylint:disable=too-many-locals
+    # pylint:disable=too-many-branches
+    # pylint:disable=too-many-statements
     col_names = list(frag_frame.columns)
     # if frag_frame already has xyz coordinates keep those and don't use others
     # typically this will be if a mol and/or cml file was provided in frag_frame construction
@@ -424,9 +429,9 @@ def count_uniques(
     if uni_smi_type:
         ty_tup = list(map(tuple, frag_frame["atom_types"]))
         smi_ty = list(zip(no_connect_smile, ty_tup))
-        for i in range(0, len(smi_ty)):
-            smile = smi_ty[i][0]
-            at_tys = smi_ty[i][1]
+        for i, val in enumerate(smi_ty):
+            smile = val[0]
+            at_tys = val[1]
             if smile not in unique_smiles:
                 unique_smiles.append(smile)
                 if xyz_inc:
@@ -620,64 +625,67 @@ def _clean_molecule_name(smile):
     return smile
 
 
-def generate_fragment_structures(
-    input: str,
-    keep_only_children: bool = True,
-    bb_patt: str = "[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35;!#1]):2]",
-    input_type="smile",
-    cml_file="",
-    include_parent=True,
-):
-    frag_frame = identify_connected_fragments(
-        input=input,
-        keep_only_children=keep_only_children,
-        bb_patt=bb_patt,
-        input_type=input_type,
-        cml_file=cml_file,
-        include_parent=include_parent,
-    )
-    mol = frag_frame.at[0, "Parent"]
-    frag_dict = output_ifc_dict(mol, frag_frame)
-    return frag_dict
+# def generate_fragment_structures(
+#     inp: str,
+#     keep_only_children: bool = True,
+#     bb_patt: str = "[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35;!#1]):2]",
+#     input_type="smile",
+#     cml_file="",
+#     include_parent=True,
+# ):
+#     """generate fragments and return a dictionary of fragments"""
+#     # pylint:disable=too-many-arguments
+#     frag_frame = identify_connected_fragments(
+#         inp=inp,
+#         keep_only_children=keep_only_children,
+#         bb_patt=bb_patt,
+#         input_type=input_type,
+#         cml_file=cml_file,
+#         include_parent=include_parent,
+#     )
+#     mol = frag_frame.at[0, "Parent"]
+#     frag_dict = output_ifc_dict(mol, frag_frame)
+#     return frag_dict
 
 
 # show
 
 
-def output_cgis_dicts(cgis_frame):
-    # should have parent col
-    a = "foo2r"
-    on_at_frame = pd.DataFrame(cgis_frame[cgis_frame["numAttachments"] == 1])
-    col_names = list(on_at_frame.columns)
-    xyz_idx = col_names.index("xyz")
-    atoms_idx = col_names.index("Atoms")
-    parent_idx = col_names.index("Parent")
-    on_at_frame["H_xyz"] = on_at_frame.apply(
-        lambda row: _find_H_xyz(
-            row[parent_idx], row[atoms_idx], row[xyz_idx], cgis_frame
-        ),
-        axis=1,
-    )
-    on_at_frame["at_idx"] = on_at_frame.apply(
-        lambda row: _find_at_idx(row[parent_idx], row[atoms_idx]), axis=1
-    )
-    out_dict = {
-        re.sub(
-            r"\[[0-9]+\*\]", "*", on_at_frame.at[i, "Smiles"]
-        ): _write_frag_structure(
-            frag_mol=on_at_frame.at[i, "Molecule"],
-            xyz_list=on_at_frame.at[i, "xyz"],
-            symb_list=on_at_frame.at[i, "Labels"],
-            h_xyz=on_at_frame.at[i, "H_xyz"],
-            at_idx=on_at_frame.at[i, "at_idx"],
-            atom_types=frag_frame.at[i, "atom_types"],
-        )
-        for i in range(0, nrow)
-    }
-    return out_dict
+# def output_cgis_dicts(cgis_frame):
+#     """generate fragments and return a dictionary of fragments"""
+#     # should have parent col
+#     on_at_frame = pd.DataFrame(cgis_frame[cgis_frame["numAttachments"] == 1])
+#     col_names = list(on_at_frame.columns)
+#     xyz_idx = col_names.index("xyz")
+#     atoms_idx = col_names.index("Atoms")
+#     parent_idx = col_names.index("Parent")
+#     on_at_frame["H_xyz"] = on_at_frame.apply(
+#         lambda row: _find_H_xyz(
+#             row[parent_idx], row[atoms_idx], row[xyz_idx], cgis_frame
+#         ),
+#         axis=1,
+#     )
+#     on_at_frame["at_idx"] = on_at_frame.apply(
+#         lambda row: _find_at_idx(row[parent_idx], row[atoms_idx]), axis=1
+#     )
+#     out_dict = {
+#         re.sub(
+#             r"\[[0-9]+\*\]", "*", on_at_frame.at[i, "Smiles"]
+#         ): _write_frag_structure(
+#             frag_mol=on_at_frame.at[i, "Molecule"],
+#             xyz_list=on_at_frame.at[i, "xyz"],
+#             symb_list=on_at_frame.at[i, "Labels"],
+#             h_xyz=on_at_frame.at[i, "H_xyz"],
+#             at_idx=on_at_frame.at[i, "at_idx"],
+#             atom_types=frag_frame.at[i, "atom_types"],
+#         )
+#         for i in range(0, nrow)
+#     }
+#     return out_dict
 
 
 def output_ifc_dict(mol, frag_frame, done_smi):
+    """generate a dictionary converting ifc output"""
     on_at_frame = pd.DataFrame(frag_frame[frag_frame["numAttachments"] == 1])
     col_names = list(on_at_frame.columns)
     # Find indices of relevant columns
@@ -691,8 +699,7 @@ def output_ifc_dict(mol, frag_frame, done_smi):
     on_at_frame["at_idx"] = on_at_frame.apply(
         lambda row: _find_at_idx(mol, row[atoms_idx]), axis=1
     )
-    hxyz = len(col_names)
-    atidx = len(col_names) + 1
+
     nrow = on_at_frame.shape[0]
     on_at_frame = on_at_frame.reset_index(drop=True)
     print(on_at_frame)
@@ -722,23 +729,18 @@ def output_ifc_dict(mol, frag_frame, done_smi):
 
 
 def _write_frag_structure(frag_mol, xyz_list, symb_list, h_xyz, at_idx, atom_types):
+    """get output structure"""
+    # pylint:disable=too-many-arguments
     print("in function")
     num_atoms = len(symb_list)
     # smile = re.sub('\[[0-9]+\*\]', '*', Chem.MolToSmiles(frag_mol,canonical=False))
     charge = Chem.GetFormalCharge(frag_mol)
-    # molecule_name = _clean_molecule_name(smile)
-    # print(at_idx)
-    # print(xyz_list[at_idx])
-    # print(h_xyz)
-    # build xyz of molecule
     out_xyz = [xyz_list[at_idx], h_xyz]
     for i in range(num_atoms):
         if i != at_idx:
             out_xyz.append(xyz_list[i])
     # geom_frame = pd.DataFrame(out_xyz,columns=['x','y','z'])
     symb_list.insert(1, "H")
-    # geom_frame['Atom'] = symb_list
-    # geom_frame = geom_frame[['Atom','x','y','z']]
     return {
         "geom": out_xyz,
         "charge": charge,
@@ -793,8 +795,8 @@ def output_ifc_gjf(
     on_at_frame["at_idx"] = on_at_frame.apply(
         lambda row: _find_at_idx(mol, row[atoms_idx]), axis=1
     )
-    hxyz = len(col_names)
-    atidx = len(col_names) + 1
+    # hxyz = len(col_names)
+    # atidx = len(col_names) + 1
     # print(on_at_frame)
     # write gjfs
     on_at_frame.apply(
@@ -802,8 +804,8 @@ def output_ifc_gjf(
             frag_mol=row[mol_idx],
             xyz_list=row[xyz_idx],
             symb_list=row[labels_idx],
-            h_xyz=row[hxyz],
-            at_idx=row[atidx],
+            h_xyz=row[len(col_names)],
+            at_idx=row[len(col_names) + 1],
             esm=esm,
             basis_set=basis_set,
             wfx=wfx,
@@ -813,7 +815,6 @@ def output_ifc_gjf(
         ),
         axis=1,
     )
-    return
 
 
 def _clean_basis(basis_set):
@@ -865,6 +866,7 @@ def _write_frag_gjf(
         {filename}.wfx
 
     """
+    # pylint:disable=too-many-locals
     num_atoms = len(symb_list)
     smile = re.sub(r"\[[0-9]+\*\]", "*", Chem.MolToSmiles(frag_mol, canonical=False))
     charge = Chem.GetFormalCharge(frag_mol)
@@ -888,8 +890,8 @@ def _write_frag_gjf(
         # print('deleting')
         os.remove(new_file_name + ".gjf")
     # write file
-    with open(new_file_name + ".gjf", "a") as f:
-        f.write("%chk={chk}\n".format(chk=new_file_name + ".chk"))
+    with open(new_file_name + ".gjf", "a", encoding="utf-8") as f:
+        f.write(f"%chk={new_file_name}" + ".chk\n")
         if n_procs:
             f.write(f"%nprocs={n_procs}\n")
         if mem:
@@ -909,7 +911,6 @@ def _write_frag_gjf(
             f.write(new_file_name + ".wfx\n\n\n")
         else:
             f.write("\n\n\n")
-    return
 
 
 def _find_at_idx(mol, at_list):
@@ -945,6 +946,7 @@ def _construct_unique_frame(
     at_types=[],
 ) -> pd.DataFrame:
     """given smiles, counts and (optional) xyz coordinates, create frame"""
+    # pylint:disable=dangerous-default-value
     uniquefrag_frame = pd.DataFrame(uni_smi, columns=["Smiles"])
     if xyz:
         uniquefrag_frame["xyz"] = xyz
@@ -1055,20 +1057,19 @@ def _find_rows_to_drop(frame_a: pd.DataFrame, frame_b: pd.DataFrame, uni_smi_ty=
     merge_frame = pd.DataFrame(columns=col_names)
     frame_a_idx = list(frame_a.index)
     frame_b_idx = list(frame_b.index)
-    if uni_smi_ty:
-        counter_b_list = list(map(Counter, frame_b["atom_types"]))
-        counter_a_list = list(map(Counter, frame_a["atom_types"]))
     for i, smi in enumerate(frame_a["Smiles"]):
         if smi in list(frame_b["Smiles"]):
             # print(f'i is {i}')
             if uni_smi_ty:
-                f_b_smi = list(frame_b["Smiles"])
-                smi_idx = [x for x in range(0, frame_b.shape[0]) if smi == f_b_smi[x]]
-                ctr = [counter_b_list[x] for x in smi_idx]
-                if counter_a_list[i] not in ctr:
+                smi_idx = [
+                    x
+                    for x in range(0, frame_b.shape[0])
+                    if smi == list(frame_b["Smiles"])[x]
+                ]
+                ctr = [list(map(Counter, frame_b["atom_types"]))[x] for x in smi_idx]
+                if list(map(Counter, frame_a["atom_types"]))[i] not in ctr:
                     continue
-                else:
-                    j = smi_idx[ctr.index(counter_a_list[i])]
+                j = smi_idx[ctr.index(list(map(Counter, frame_a["atom_types"]))[i])]
             else:
                 j = list(frame_b["Smiles"]).index(smi)
             # print(f'j is {j}')
@@ -1111,7 +1112,7 @@ def count_groups_in_set(
     drop_attachments: bool = False,
     input_type="smile",
     bb_patt="[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35;!#1]):2]",
-    cml_list=[],
+    cml_list=None,
     uni_smi_ty=True,
     aiida=False,
 ) -> pd.DataFrame:
