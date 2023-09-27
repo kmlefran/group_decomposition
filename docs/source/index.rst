@@ -10,7 +10,10 @@ Welcome to group_decomposition's documentation!
    :maxdepth: 2
    :caption: Contents:
 
-
+   usage
+   api
+   utilsusage
+   fileusage
 
 Indices and tables
 ==================

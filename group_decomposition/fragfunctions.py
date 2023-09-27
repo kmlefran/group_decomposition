@@ -197,22 +197,25 @@ def identify_connected_fragments(
 
     Args:
         input: a string containing either a smiles or a .mol filename for a given molecule
-            update input_type below to match provided input
+        update input_type below to match provided input
         keep_only_children: boolean, if True, when a group is broken down into its components
-            remove the parent group from output. If False, parent group is retained
+        remove the parent group from output. If False, parent group is retained
         bb_patt: string of SMARTS pattern for bonds to be broken in side chains and linkers
-            defaults to cleaving sp3 carbon-((ring OR not sp3 carbon) AND not-placeholder/halogen/H)
+        defaults to cleaving sp3 carbon-((ring OR not sp3 carbon) AND not-placeholder/halogen/H)
         input_type = 'smile' if SMILES code or 'molfile' if .mol file, or 'xyzfile' if .xyz file
-            Note: xyz file REQUIRES .cml file as well
+        Note: xyz file REQUIRES .cml file as well
         cml_file: defaults to none, can be the cml file corresponding to the input .mol file
         include_parent = Boolean. If True, include column in output frame repeating parent molecule
-            intended use for True when merging multiple molecule fragment frames but need to retain a parent molecule object
+        intended use for True when merging multiple molecule fragment frames but need to retain a parent molecule object
+
     Returns:
         pandas data frame with columms 'Smiles', 'Molecule', 'numAttachments' and 'xyz'
         Containing, fragment smiles, fragment Chem.Molecule object, number of * placeholders,
-          and rough xyz coordinates for the fragment is * were At
-    Notes: currently will break apart a functional group if contains a ring-non-ring single bond.
-    e.g. ring N-nonring S=O -> ring N-[1*] nonring S=O-[1*]
+        and rough xyz coordinates for the fragment is * were At
+
+    Notes:
+        currently will break apart a functional group if contains a ring-non-ring single bond.
+        e.g. ring N-nonring S=O -> ring N-[1*] nonring S=O-[1*]
     """
     # pylint:disable=too-many-arguments
     # pylint:disable=too-many-branches
@@ -394,15 +397,17 @@ def count_uniques(
     Returns:
         pandas data frame with columns 'Smiles', 'count' and 'Molecule',
         containing the Smiles string, the number of times the Smiles was in frag_frame,
-          and rdkit.Chem.Molecule object
+        and rdkit.Chem.Molecule object
 
-    Notes: if drop_attachments=False, similar fragments with different number/positions of
-    attachments will not count as being the same.
-    e.g. ortho-attached aromatics would not match with meta or para attached aromatics
+    Notes:
+        if drop_attachments=False, similar fragments with different number/positions of
+        attachments will not count as being the same.
+        e.g. ortho-attached aromatics would not match with meta or para attached aromatics
 
-    If you've ran this previously with uni_smi_type=True, running on the output frame
-    (or other frame derived from such frame)
-    with uni_smi_type=False will collapse the output uniques determined by SMILE only
+        If you've ran this previously with uni_smi_type=True, running on the output frame
+        (or other frame derived from such frame)
+        with uni_smi_type=False will collapse the output uniques determined by SMILE only
+
     """
     # Change column indices to dict
     # pylint:disable=too-many-locals
@@ -1156,13 +1161,13 @@ def count_groups_in_set(
     Args:
         list_of_smiles: A list, with each element being a SMILES string, e.g. ['CC','C1CCCC1']
         drop_attachments: Boolean for whether or not to drop attachment points from fragments
-            if True, will remove all placeholder atoms indicating connectivity
-            if False, placeholder atoms will remain
+        if True, will remove all placeholder atoms indicating connectivity
+        if False, placeholder atoms will remain
         input_type: smile, xyzfile, cmlfile or molfile, based on elements of lists_of_inputs
         cml_list = defaults empty, but can be a list of cml files corresponding to the molfile inputs
-        #bb_patt = SMARTS pattern for bonds to break in linkers and side chains. Defaults to breaking
-            bonds between nonring carbons with four bonds single bonded to ring atoms or carbons that
-            don't have four bonds, and are not H, halide, or placeholder
+        bb_patt = SMARTS pattern for bonds to break in linkers and side chains. Defaults to breaking
+        bonds between nonring carbons with four bonds single bonded to ring atoms or carbons that
+        don't have four bonds, and are not H, halide, or placeholder
         uni_smi_type = boolean - if True, include atom types in determination of unique
         fragments. If false, only determine unique by SMILES
     Returns:
