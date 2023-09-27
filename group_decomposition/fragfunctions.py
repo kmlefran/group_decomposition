@@ -165,6 +165,8 @@ def generate_molecule_fragments(
     """Fragment a molecule, first breaking ring-nonring single bonds,
     single bonds to atoms double bodned to ring
      Then generate alkyl groups"""
+    global _num_bonds_broken  # pylint:disable=global-statement
+    _num_bonds_broken = 0
     first_break = fragment_molecule([mol], patt="[!#0;R:1]-!@[!#0;!#1:2]")
     second_break = fragment_molecule(
         first_break, patt="[$([!#0;!R]=[!#0;R]):1]-[!#0;!#1;!R:2]"
