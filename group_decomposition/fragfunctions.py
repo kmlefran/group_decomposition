@@ -107,12 +107,42 @@ def fragment_molecule(mol_list, patt, exld_ring=False, drop_parent=True):
             frag_smis = Chem.MolToSmiles(frag_mols_comb).split(".")
             # print(frag_smis)
             frag_mols = [Chem.MolFromSmiles(x) for x in frag_smis]
+            frag_mols = recombine_monoatomic(frag_mols)
+
             if not drop_parent:
                 out_mols = out_mols + [mol]
             out_mols = out_mols + frag_mols
         else:
             out_mols = out_mols + [mol]
     return out_mols
+
+
+def recombine_monoatomic(frag_mols):
+    """Take fragments and recombine"""
+    # pylint:disable=too-many-nested-blocks
+    for m in frag_mols:
+        link = None
+        if m.GetNumHeavyAtoms() == 1:
+            dummy_atoms = [x for x in m.GetAtoms() if x.GetAtomicNum() == 0]
+            dummy_atom_iso = [x.GetIsotope() for x in dummy_atoms]
+            dummy_match = []
+            for i, dum in enumerate(dummy_atom_iso):
+                for mo in frag_mols:
+                    if mo != m:
+                        for at in mo.GetAtoms():
+                            if at.GetAtomicNum() == 0 and at.GetIsotope() == dum:
+                                dummy_match.append(mo)
+            for i, iso in enumerate(dummy_atom_iso):
+                if i == 0:
+                    link = utils.link_molecules(m, dummy_match[i], iso, iso)
+                else:
+                    link = utils.link_molecules(link, dummy_match[i], iso, iso)
+        if link:
+            frag_mols.append(link)
+            frag_mols.remove(m)
+            for mo in dummy_match:
+                frag_mols.remove(mo)
+    return frag_mols
 
 
 def get_num_placeholders(mol):
