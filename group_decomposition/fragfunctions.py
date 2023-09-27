@@ -82,7 +82,9 @@ def _add_number_attachements(frag_frame):
     return frag_frame
 
 
-def fragment_molecule(mol_list, patt, exld_ring=False, drop_parent=True):
+def fragment_molecule(
+    mol_list, patt, exld_ring=False, drop_parent=True, recombine_mono=False
+):
     """Break molecules into fragments based on fragmenting pattern"""
     global _num_bonds_broken  # pylint:disable=global-statement
     out_mols = []
@@ -107,7 +109,8 @@ def fragment_molecule(mol_list, patt, exld_ring=False, drop_parent=True):
             frag_smis = Chem.MolToSmiles(frag_mols_comb).split(".")
             # print(frag_smis)
             frag_mols = [Chem.MolFromSmiles(x) for x in frag_smis]
-            frag_mols = recombine_monoatomic(frag_mols)
+            if recombine_mono:
+                frag_mols = recombine_monoatomic(frag_mols)
 
             if not drop_parent:
                 out_mols = out_mols + [mol]
@@ -167,7 +170,7 @@ def generate_molecule_fragments(
         first_break, patt="[$([!#0;!R]=[!#0;R]):1]-[!#0;!#1;!R:2]"
     )
     third_break = fragment_molecule(
-        second_break, patt, exld_ring=True, drop_parent=drop_parent
+        second_break, patt, exld_ring=True, drop_parent=drop_parent, recombine_mono=True
     )
     return third_break
 
