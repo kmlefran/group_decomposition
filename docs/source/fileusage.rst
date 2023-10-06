@@ -1,18 +1,21 @@
 File Parsing Tools
 ==================
 
-Installation
-------------
-
-To use group_decomposition, first install it using pip:
-
-.. code-block:: console
-
-    (.venv) $ pip install group_decomposition
-
 Extract Data from CML
 ---------------------
 .. autofunction:: group_decomposition.utils.all_data_from_cml
+
+Extract Data from CML
+---------------------
+.. autofunction:: group_decomposition.utils.data_from_cml
+
+Extract Atom Types from CML
+---------------------------
+.. autofunction:: group_decomposition.utils.get_cml_atom_types
+
+Extract SMILEs from cml
+-----------------------
+.. autofunction:: group_decomposition.utils.smiles_from_cml
 
 Get XYZ from CML
 ----------------

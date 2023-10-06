@@ -51,7 +51,17 @@ def trim_placeholders(rwmol):
 
 def mol_with_atom_index(mol):
     """Label a molecule with map numbers for order atoms are in molecule.
-    Useful for tracking atoms after fragmenting"""
+
+    Useful for tracking atoms after fragmenting
+
+    Args:
+        mol: an rdkit molecule object
+
+    Returns:
+        rdkit molecule object with AtomMapNum set so that atom 0
+        has map number 1, atom 1 has map number 2...etc
+
+    """
     # from https://www.rdkit.org/docs/Cookbook.html
     for atom in mol.GetAtoms():
         if atom.GetAtomicNum() != 0:
@@ -123,7 +133,16 @@ def _get_charge_from_cml(cml_file):
 
 
 def get_cml_atom_types(cml_file):
-    """Extract atom types from cml file"""
+    """Extract atom types from cml file
+
+    Args:
+        cml_file: cml file name
+
+    Returns:
+        Data Frame column whose elements are tuples of
+        atom types as defined by Retrievium. (atom number, type, valence)
+
+    """
     n_atl = 0
     type_list = []
     idx_list = []
@@ -150,42 +169,42 @@ def get_cml_atom_types(cml_file):
     return temp_frame["type"]
 
 
-def add_cml_atoms_bonds(el_list, bond_list):
-    """create a molecule from cml file, building it one atom at a time then
-    adding in bond orders.
+# def add_cml_atoms_bonds(el_list, bond_list):
+#     """create a molecule from cml file, building it one atom at a time then
+#     adding in bond orders.
 
-    Note: Bond orders from Retrievium cml are problematic at times.
+#     Note: Bond orders from Retrievium cml are problematic at times.
 
-    Recommended construction is to build atoms and connectivity from cml file
-    Then assign bond orders based on template smiles also found in cml file"""
-    flag = 1
-    for atom in el_list:
-        if flag:
-            mol = Chem.MolFromSmiles(atom)
-            rwmol = Chem.RWMol(mol)
-            rwmol.BeginBatchEdit()
-            flag = 0
-        else:
-            rwmol.AddAtom(Chem.Atom(atom))
-    # mw.AddBond(6,7,Chem.BondType.SINGLE)
-    for bond in bond_list:
-        if bond[2] == "S":
-            rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.SINGLE)
-        elif bond[2] == "D":
-            rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.DOUBLE)
-        elif bond[2] == "T":
-            rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.TRIPLE)
-        elif bond[2] == "A":
-            rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.AROMATIC)
-    rwmol.CommitBatchEdit()
-    return rwmol
+#     Recommended construction is to build atoms and connectivity from cml file
+#     Then assign bond orders based on template smiles also found in cml file"""
+#     flag = 1
+#     for atom in el_list:
+#         if flag:
+#             mol = Chem.MolFromSmiles(atom)
+#             rwmol = Chem.RWMol(mol)
+#             rwmol.BeginBatchEdit()
+#             flag = 0
+#         else:
+#             rwmol.AddAtom(Chem.Atom(atom))
+#     # mw.AddBond(6,7,Chem.BondType.SINGLE)
+#     for bond in bond_list:
+#         if bond[2] == "S":
+#             rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.SINGLE)
+#         elif bond[2] == "D":
+#             rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.DOUBLE)
+#         elif bond[2] == "T":
+#             rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.TRIPLE)
+#         elif bond[2] == "A":
+#             rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.AROMATIC)
+#     rwmol.CommitBatchEdit()
+#     return rwmol
 
 
-def add_cml_single_atoms_bonds(el_list, bond_list):
+def _add_cml_single_atoms_bonds(el_list, bond_list):
     """Build a mol from list of atoms and bonds, one atom at a time
     Bonds assigned are only single bonds.
 
-    Adjust bonds after with modAssignBondOrdersFromTemplate"""
+    Adjust bonds after with _modAssignBondOrdersFromTemplate"""
     rwmol = Chem.RWMol(Chem.Mol())
     for atom in el_list:
         rwmol.AddAtom(Chem.Atom(atom))
@@ -197,7 +216,18 @@ def add_cml_single_atoms_bonds(el_list, bond_list):
 
 
 def smiles_from_cml(cml_file):
-    """Finds the Retreivium input SMILES in a cml file"""
+    """Finds the Retreivium input SMILES in a cml file
+
+    Args:
+        cml_file: cml file name
+
+    Returns:
+        string of the input SMILES code tagged in the file as retrievium:inputSMILES
+
+    Note:
+        Must be used on .cml files from the Retrievium database https://retrievium.ca
+
+    """
     flag = 0
     with open(cml_file, encoding="utf-8") as file:
         for line in file:
@@ -219,13 +249,17 @@ def mol_from_cml(cml_file, input_type="cmlfile"):
     error to file
 
     Args:
-        cml_file - name of cml in current directory or path to the file
-        input_type - cmlfile or cmldict - cmlfile if just raw cml file, cmldict if filename
+        cml_file: cml file name or dictionary containing cml data
+        input_type: cmlfile or cmldict. Use cmlfile if just raw cml file, use cmldict if dictionary
+
     Returns:
-        list of [Molecule, list of atom symbols in molecule,
+        list with elements: [Molecule, list of atom symbols in molecule,
         list of xyz coords of atoms in molecule,
         list of atom types of atoms in molecule]
-        Note: list order matches mol numbering in cml
+
+    Note:
+        list order matches mol numbering in cml
+
     """
 
     if input_type == "cmlfile":
@@ -238,13 +272,13 @@ def mol_from_cml(cml_file, input_type="cmlfile"):
         el_list = cml_file["labels"]
         # charge = cml_file["charge"]
         smile = cml_file["smiles"]
-    rwmol = add_cml_single_atoms_bonds(el_list, bond_list)
+    rwmol = _add_cml_single_atoms_bonds(el_list, bond_list)
     for atom in rwmol.GetAtoms():
         atom.SetNoImplicit(True)
 
     rwmol2 = Chem.RemoveHs(rwmol, implicitOnly=True, updateExplicitCount=False)
     template = AllChem.MolFromSmiles(smile)
-    bond_mol = modAssignBondOrdersFromTemplate(template, rwmol2, cml_file)
+    bond_mol = _modAssignBondOrdersFromTemplate(template, rwmol2, cml_file)
     # need rings for aromaticity check
     # if os.path.isfile('error_log.txt'):
     #     er_file = open('error_log.txt','a')
@@ -260,7 +294,7 @@ def mol_from_cml(cml_file, input_type="cmlfile"):
         try:
             Chem.SanitizeMol(bond_mol)
         except:  # pylint:disable=bare-except
-            write_error(f"Could not sanitize {cml_file}\n")
+            _write_error(f"Could not sanitize {cml_file}\n")
             return [None, None, None, None]
         return [mol_with_atom_index(bond_mol), el_list, xyz_coords, at_types]
         # if os.path.isfile('error_log.txt'):
@@ -274,7 +308,7 @@ def mol_from_cml(cml_file, input_type="cmlfile"):
     return [None, None, None, None]
 
 
-def write_error(errormessage):
+def _write_error(errormessage):
     """writes errormessage to errorlog.txt"""
     if os.path.isfile("error_log.txt"):
         with open("error_log.txt", "a", encoding="utf-8") as er_file:
@@ -284,7 +318,7 @@ def write_error(errormessage):
             er_file.write(errormessage)
 
 
-def modAssignBondOrdersFromTemplate(refmol, mol, cml_file):
+def _modAssignBondOrdersFromTemplate(refmol, mol, cml_file):
     """This is originally from RDKit AllChem module.
       Modified here by Kevin Lefrancois-Gagnon(KLG) to disallow implicit hydrogens on all
       molcule objects used. This corresponds to the 4 for loops after creation of mol
@@ -402,9 +436,9 @@ def modAssignBondOrdersFromTemplate(refmol, mol, cml_file):
             except:  # pylint:disable=bare-except
                 er_message = f"Could not sanitize {cml_file}\n"
                 # smile = smiles_from_cml(cml_file)
-                er_message += at_num_er(refmol2, mol2)
+                er_message += _at_num_er(refmol2, mol2)
                 # smimol = Chem.MolFromSmiles()
-                write_error(er_message)
+                _write_error(er_message)
                 return None
             if hasattr(mol2, "__sssAtoms"):  # pylint:disable=protected-access
                 mol2.__sssAtoms = None  # pylint:disable=protected-access # we don't want all bonds highlighted
@@ -412,13 +446,13 @@ def modAssignBondOrdersFromTemplate(refmol, mol, cml_file):
             er_message = (
                 f"No match between template smiles and connected geom for {cml_file}\n"
             )
-            er_message += at_num_er(refmol2, mol2)
-            write_error(er_message)
+            er_message += _at_num_er(refmol2, mol2)
+            _write_error(er_message)
             return None
     return mol2
 
 
-def at_num_er(refmol2, mol2):
+def _at_num_er(refmol2, mol2):
     """check numbering of atoms"""
     er_message = ""
     smi_num = []
@@ -445,7 +479,29 @@ def at_num_er(refmol2, mol2):
 
 
 def data_from_cml(cml_file, bonds=False):
-    """Gets symbols, xyz coords, bonds and charge of a mol from cml file"""
+    """Gets symbols, xyz coords, bonds and charge of a mol from cml file
+
+    Args:
+        cml_file: .cml filename
+
+    Returns:
+        list with relevant data from cml file.
+        Elements in order are: molecular geometry, atom types,
+        list of bonds, list of elements, charge
+
+
+    Note:
+        This is designed to parse files specifically from the Retrievium database
+        https://retrievium.ca
+
+        the SMILEs extracted is labelled with tag retrievium:inputSMILES
+
+        The geometry extracted is from the third atomArray block in the .cml file
+
+    Example Usage:
+        >>> utils.data_from_cml(cml_file)
+
+    """
     # pylint:disable=too-many-locals
     # pylint:disable=too-many-branches
     # pylint:disable=too-many-statements
@@ -530,7 +586,31 @@ def data_from_cml(cml_file, bonds=False):
 
 
 def all_data_from_cml(data):
-    """Gets symbols, xyz coords, bonds and charge of a mol from cml file"""
+    """Gets symbols, xyz coords, bonds and charge of a mol from cml file
+
+    Args:
+        data: lines of a .cml file
+
+    Returns:
+        dictionary with relevant data from cml file.
+        Keys included are 'geom', 'atom_types', 'bonds',
+        'labels', 'charge', 'multiplicity', 'smiles'
+
+    Note:
+        Not used in :attr:`group_decomposition.fragfunctions.identify_connected_fragments`
+        This is used in an AiiDA workflow employing this package
+
+        This is designed to parse files specifically from the Retrievium database
+        https://retrievium.ca
+
+        the SMILEs extracted is labelled with tag retrievium:inputSMILES
+
+        The geometry extracted is from the third atomArray block in the .cml file
+
+    Example Usage:
+        >>> utils.all_data_from_cml(cml_file)
+
+    """
     # pylint:disable=too-many-locals
     # pylint:disable=too-many-branches
     # pylint:disable=too-many-statements
@@ -646,9 +726,18 @@ def list_to_str(lst):
 
 def mol_from_molfile(mol_file):
     """takes mol_file and returns mol wth atom numbers the same
-    #modified for mol file structure from retrievium
+
+    Modified for mol file structure from retrievium
     from stackexchange
-    https://mattermodeling.stackexchange.com/questions/7234/how-to-input-3d-coordinates-from-xyz-file-and-connectivity-from-smiles-in-rdkit"""  # pylint:disable=line-too-long
+    https://mattermodeling.stackexchange.com/questions/7234/how-to-input-3d-coordinates-from-xyz-file-and-connectivity-from-smiles-in-rdkit
+
+    Args:
+        mol_file: name of .mol file
+
+    Returns:
+        mol with AtomMapNumbers labeled by :attr:`group_decomposition.utils.mol_with_atom_index`
+
+    """  # pylint:disable=line-too-long
     m = Chem.MolFromMolFile(mol_file, removeHs=False)
     if not m:
         raise ValueError(f"""Problem creating molecule from {mol_file}""")
@@ -673,7 +762,18 @@ def mol_from_molfile(mol_file):
 
 
 def xyz_from_cml(cml_file):
-    """Extract xyz coordinates from cml file"""
+    """Extract xyz coordinates from cml file
+
+    Args:
+        cml_file: cml file name
+
+    Returns:
+        list of length 3 lists containing a molecule's xyz coordinates
+
+    Note:
+        Must be used on .cml files from the Retrievium database https://retrievium.ca
+
+    """
     num_atom_array = 0
     geom_list = []
     with open(cml_file, encoding="utf-8") as file:
@@ -789,13 +889,13 @@ def link_molecules(mol_1: Chem.Mol, mol_2: Chem.Mol, dl_1: int, dl_2: int):
     return m
 
 
-def copy_molecule(molecule):
-    """create a copy of molecule object in new object(not pointer)"""
-    # see link https://sourceforge.net/p/rdkit/mailman/message/33652439/
-    return Chem.Mol(molecule)
+# def copy_molecule(molecule):
+#     """create a copy of molecule object in new object(not pointer)"""
+#     # see link https://sourceforge.net/p/rdkit/mailman/message/33652439/
+#     return Chem.Mol(molecule)
 
 
-def clean_smile(trim_smi):
+def _clean_smile(trim_smi):
     """remove leftover junk from smiles when atom deleted."""
     trim_smi = trim_smi.replace("[*H]", "*")
     trim_smi = trim_smi.replace("[*H3]", "*")

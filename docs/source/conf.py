@@ -1,21 +1,17 @@
+# -- Project information -----------------------------------------------------
+
+
 # Configuration file for the Sphinx documentation builder.
 #
-# This file only contains a selection of the most common options. For a full
-# list see the documentation:
+# For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-# -- Path setup --------------------------------------------------------------
-
-# If extensions (or modules to document with autodoc) are in another directory,
-# add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
-#
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
-
+import pathlib
+import sys
 
 # -- Project information -----------------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
+import sphinx_rtd_theme
 
 project = "group_decomposition"
 copyright = "2023, Kevin M. Lefrancois-Gagnon and Robert C. Mawhinney"
@@ -25,32 +21,6 @@ author = "Kevin M. Lefrancois-Gagnon and Robert C. Mawhinney"
 release = "0.3.17"
 
 
-# -- General configuration ---------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
-# Add any Sphinx extension module names here, as strings. They can be
-# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
-# ones.
-extensions = []
-
-# Add any paths that contain templates here, relative to this directory.
-templates_path = ["_templates"]
-
-# List of patterns, relative to source directory, that match files and
-# directories to ignore when looking for source files.
-# This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = []
-
-import os
-
-# -- Options for HTML output -------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
-import pathlib
-import sys
-
-sys.path.insert(0, os.path.abspath("../.."))
-sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
-html_theme = "alabaster"
-html_static_path = ["_static"]
 extensions = [
     "sphinx.ext.duration",
     "sphinx.ext.doctest",
@@ -58,4 +28,32 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.coverage",
     "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.intersphinx",
 ]
+# -- General configuration ---------------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
+
+
+templates_path = ["_templates"]
+exclude_patterns = []
+
+
+import os
+
+# -- Options for HTML output -------------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
+
+
+sys.path.insert(0, os.path.abspath("../.."))
+sys.path.insert(0, pathlib.Path(__file__).parents[2].resolve().as_posix())
+source_suffix = ".rst"
+master_doc = "index"
+pygments_style = "sphinx"
+html_theme = "sphinx_rtd_theme"
+html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/", None),
+    "numpy": ("http://docs.scipy.org/doc/numpy/", None),
+}
