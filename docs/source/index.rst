@@ -16,6 +16,7 @@ Welcome to group_decomposition's documentation!
    utilsusage
    fileusage
    molecule_usage
+   query
    api
 
 Indices and tables
