@@ -14,7 +14,6 @@
    .. autosummary::
 
       all_data_from_cml
-      count_fgs
       data_from_cml
       get_canonical_molecule
       get_cml_atom_types
@@ -25,7 +24,6 @@
       mol_from_cml
       mol_from_molfile
       mol_with_atom_index
-      query_pattern
       smiles_from_cml
       trim_placeholders
       xyz_from_cml

@@ -1,14 +1,6 @@
 Molecule Manipulation and Information Tools
 ===========================================
 
-Determine Number of a Functional Group Present
-----------------------------------------------
-.. autofunction:: group_decomposition.utils.query_pattern
-
-Determine Number of Many Functional Groups Present
---------------------------------------------------
-.. autofunction:: group_decomposition.utils.count_fgs
-
 Get Molecule with Canonical Numbering
 -------------------------------------
 .. autofunction:: group_decomposition.utils.get_canonical_molecule

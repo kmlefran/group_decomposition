@@ -825,7 +825,7 @@ def link_molecules(mol_1: Chem.Mol, mol_2: Chem.Mol, dl_1: int, dl_2: int):
         mol_1: Chem.Mol object
         mol_2: Chem.Mol object
         dl_1: the isotope of the dummy atom in mol_1 which will be replaced by mol_2
-         dl_2: the isotope of the dummy atom in mol_2 which will be replaced by mol_1
+        dl_2: the isotope of the dummy atom in mol_2 which will be replaced by mol_1
 
     Returns:
         Chem.Mol object with mol_1 and mol_2 linked where dl_1 and dl_2 were"""
