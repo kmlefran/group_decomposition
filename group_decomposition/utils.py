@@ -11,6 +11,7 @@ import pandas as pd
 from rdkit import Chem  # pylint:disable=import-error
 from rdkit.Chem import (  # pylint:disable=import-error # search for rdScaffoldAttachment points * to remove; pylint:disable=import-error; rdDetermineBonds,
     AllChem,
+    rdDetermineBonds,
     rdqueries,
 )
 
@@ -85,42 +86,46 @@ def _get_charge_from_cml(cml_file):
     return charge
 
 
-# def mol_from_xyzfile(xyz_file: str, cml_file):
-#     """Attempt to create a molecule from an xyz file by automatically determining bond orders"""
-#     # raw_mol = Chem.MolFromXYZFile('DUDE_67368827_adrb2_decoys_C19H25N3O4_CIR.xyz')
-#     # mol = Chem.Mol(raw_mol)
-#     # rdDetermineBonds.DetermineConnectivity(mol)
-#     # rdDetermineBonds.DetermineBondOrders(mol)
-#     mol = Chem.Mol(Chem.MolFromXYZFile(xyz_file))
-#     try:
-#         rdDetermineBonds.DetermineBonds(mol, charge=_get_charge_from_cml(cml_file))
-#     except:  # pylint:disable=bare-except
-#         if os.path.isfile("error_log.txt"):
-#             with open("error_log.txt", "a", encoding="utf-8") as er_file:
-#                 er_file.write(f"Could not determine bond orders for {cml_file}\n")
-#         else:
-#             with open("error_log.txt", "w", encoding="utf-8") as er_file:
-#                 er_file.write(f"Could not determine bond orders for {cml_file}\n")
-#         return None
+def mol_from_xyzfile(xyz_file: str, cml_file):
+    """Attempt to create a molecule from an xyz file by automatically determining bond orders"""
+    # raw_mol = Chem.MolFromXYZFile('DUDE_67368827_adrb2_decoys_C19H25N3O4_CIR.xyz')
+    # mol = Chem.Mol(raw_mol)
+    # rdDetermineBonds.DetermineConnectivity(mol)
+    # rdDetermineBonds.DetermineBondOrders(mol)
+    mol = Chem.Mol(Chem.MolFromXYZFile(xyz_file))
+    try:
+        rdDetermineBonds.DetermineBonds(mol, charge=_get_charge_from_cml(cml_file))
+    except:  # pylint:disable=bare-except
+        if os.path.isfile("error_log.txt"):
+            with open("error_log.txt", "a", encoding="utf-8") as er_file:
+                er_file.write(
+                    f"Could not determine bond orders from xyz for {cml_file}\n"
+                )
+        else:
+            with open("error_log.txt", "w", encoding="utf-8") as er_file:
+                er_file.write(f"Could not determine bond orders for {cml_file}\n")
+        return None
 
-#     atomic_symbols = []
-#     xyz_coordinates = []
-#     ats_read = 0
-#     num_atoms = mol.GetNumAtoms()
-#     with open(xyz_file, encoding="utf-8") as file:
-#         for line_number, line in enumerate(file):
-#             if ats_read < num_atoms and line_number > 1:
-#                 ats_read += 1
-#                 atomic_symbol, x, y, z = line.split()[:4]
-#                 atomic_symbols.append(atomic_symbol)
-#                 xyz_coordinates.append([float(x), float(y), float(z)])
-#             elif ats_read == num_atoms:
-#                 break
-#     return {
-#         "Molecule": mol_with_atom_index(mol),
-#         "xyz_pos": xyz_coordinates,
-#         "atomic_symbols": atomic_symbols,
-#     }
+    atomic_symbols = []
+    xyz_coordinates = []
+    ats_read = 0
+    num_atoms = mol.GetNumAtoms()
+    with open(xyz_file, encoding="utf-8") as file:
+        for line_number, line in enumerate(file):
+            if ats_read < num_atoms and line_number > 1:
+                ats_read += 1
+                atomic_symbol, x, y, z = line.split()[:4]
+                atomic_symbols.append(atomic_symbol)
+                xyz_coordinates.append([float(x), float(y), float(z)])
+            elif ats_read == num_atoms:
+                break
+    return {
+        "Molecule": mol_with_atom_index(mol),
+        "xyz_pos": xyz_coordinates,
+        "atomic_symbols": atomic_symbols,
+    }
+
+
 # from https://github.com/rdkit/rdkit/issues/2413
 # conf = m.GetConformer()
 
@@ -169,35 +174,35 @@ def get_cml_atom_types(cml_file):
     return temp_frame["type"]
 
 
-# def add_cml_atoms_bonds(el_list, bond_list):
-#     """create a molecule from cml file, building it one atom at a time then
-#     adding in bond orders.
+def add_cml_atoms_bonds(el_list, bond_list):
+    """create a molecule from cml file, building it one atom at a time then
+    adding in bond orders.
 
-#     Note: Bond orders from Retrievium cml are problematic at times.
+    Note: Bond orders from Retrievium cml are problematic at times.
 
-#     Recommended construction is to build atoms and connectivity from cml file
-#     Then assign bond orders based on template smiles also found in cml file"""
-#     flag = 1
-#     for atom in el_list:
-#         if flag:
-#             mol = Chem.MolFromSmiles(atom)
-#             rwmol = Chem.RWMol(mol)
-#             rwmol.BeginBatchEdit()
-#             flag = 0
-#         else:
-#             rwmol.AddAtom(Chem.Atom(atom))
-#     # mw.AddBond(6,7,Chem.BondType.SINGLE)
-#     for bond in bond_list:
-#         if bond[2] == "S":
-#             rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.SINGLE)
-#         elif bond[2] == "D":
-#             rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.DOUBLE)
-#         elif bond[2] == "T":
-#             rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.TRIPLE)
-#         elif bond[2] == "A":
-#             rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.AROMATIC)
-#     rwmol.CommitBatchEdit()
-#     return rwmol
+    Recommended construction is to build atoms and connectivity from cml file
+    Then assign bond orders based on template smiles also found in cml file"""
+    flag = 1
+    for atom in el_list:
+        if flag:
+            mol = Chem.MolFromSmiles(atom)
+            rwmol = Chem.RWMol(mol)
+            rwmol.BeginBatchEdit()
+            flag = 0
+        else:
+            rwmol.AddAtom(Chem.Atom(atom))
+    # mw.AddBond(6,7,Chem.BondType.SINGLE)
+    for bond in bond_list:
+        if bond[2] == "S":
+            rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.SINGLE)
+        elif bond[2] == "D":
+            rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.DOUBLE)
+        elif bond[2] == "T":
+            rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.TRIPLE)
+        elif bond[2] == "A":
+            rwmol.AddBond(bond[0] - 1, bond[1] - 1, Chem.BondType.AROMATIC)
+    rwmol.CommitBatchEdit()
+    return rwmol
 
 
 def _add_cml_single_atoms_bonds(el_list, bond_list):
