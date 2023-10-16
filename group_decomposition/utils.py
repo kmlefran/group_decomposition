@@ -220,11 +220,12 @@ def _add_cml_single_atoms_bonds(el_list, bond_list):
     return rwmol
 
 
-def smiles_from_cml(cml_file):
-    """Finds the Retreivium input SMILES in a cml file
+def smiles_from_cml(cml_file, smile_tag="retrievium:inputSMILES"):
+    """Finds the Retreivium  SMILES in a cml file with a given label
 
     Args:
         cml_file: cml file name
+        smile_tag: the label fo the SMILEs in the cml file. Defaults to input SMILEs
 
     Returns:
         string of the input SMILES code tagged in the file as retrievium:inputSMILES
@@ -236,7 +237,7 @@ def smiles_from_cml(cml_file):
     flag = 0
     with open(cml_file, encoding="utf-8") as file:
         for line in file:
-            if "retrievium:inputSMILES" in line:
+            if smile_tag in line:
                 flag = 1
             elif flag == 1:
                 smile = line.split(">")[1].split("<")[0]
