@@ -129,13 +129,15 @@ def _recombine_monoatomic(frag_mols):
             dummy_atoms = [x for x in m.GetAtoms() if x.GetAtomicNum() == 0]
             dummy_atom_iso = [x.GetIsotope() for x in dummy_atoms]
             dummy_match = []
+            matched_iso = []
             for i, dum in enumerate(dummy_atom_iso):
                 for mo in frag_mols:
                     if mo != m:
                         for at in mo.GetAtoms():
                             if at.GetAtomicNum() == 0 and at.GetIsotope() == dum:
                                 dummy_match.append(mo)
-            for i, iso in enumerate(dummy_atom_iso):
+                                matched_iso.append(dum)
+            for i, iso in enumerate(matched_iso):
                 if i == 0:
                     link = utils.link_molecules(m, dummy_match[i], iso, iso)
                 else:
