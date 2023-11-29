@@ -196,7 +196,7 @@ def generate_molecule_fragments(
 
     """
     global _num_bonds_broken  # pylint:disable=global-statement
-    _num_bonds_broken = 0
+    _num_bonds_broken = 1
     first_break = _fragment_molecule([mol], patt="[!#0;R:1]-!@[!#0;!#1:2]")
     second_break = _fragment_molecule(
         first_break, patt="[$([!#0;!R]=[!#0;R]):1]-[!#0;!#1;!R:2]"
