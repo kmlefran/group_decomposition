@@ -785,6 +785,8 @@ def output_ifc_dict(mol, frag_frame: pd.DataFrame, done_smi: list[str]):
 
     """
     on_at_frame = pd.DataFrame(frag_frame[frag_frame["numAttachments"] == 1])
+    if on_at_frame.empty:
+        return None, done_smi
     col_names = list(on_at_frame.columns)
     # Find indices of relevant columns
     xyz_idx = col_names.index("xyz")
