@@ -417,7 +417,7 @@ def _add_frag_comp(frag_frame, mol):
 
 
 def count_uniques(
-    frag_frame: pd.DataFrame, drop_attachments: bool = False, uni_smi_type: bool = True
+    frag_frame: pd.DataFrame, drop_attachments: bool = False, uni_smi_type: bool = False
 ) -> pd.DataFrame:
     r"""Identify unique fragments in a frame and count the number of times they occur
 
