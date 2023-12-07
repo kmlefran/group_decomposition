@@ -802,14 +802,14 @@ def output_ifc_dict(mol, frag_frame: pd.DataFrame, done_smi: list[str]):
 
     nrow = on_at_frame.shape[0]
     on_at_frame = on_at_frame.reset_index(drop=True)
-    print(on_at_frame)
+    # print(on_at_frame)
     # print(_clean_molecule_name(on_at_frame.at[0,'Smiles']))
-    print(on_at_frame.at[0, "Molecule"])
-    print(on_at_frame.at[0, "Labels"])
-    print(on_at_frame.at[0, "xyz"])
-    print(on_at_frame.at[0, "H_xyz"])
-    print(on_at_frame.at[0, "at_idx"])
-    print(on_at_frame.at[0, "atom_types"])
+    # print(on_at_frame.at[0, "Molecule"])
+    # print(on_at_frame.at[0, "Labels"])
+    # print(on_at_frame.at[0, "xyz"])
+    # print(on_at_frame.at[0, "H_xyz"])
+    # print(on_at_frame.at[0, "at_idx"])
+    # print(on_at_frame.at[0, "atom_types"])
 
     out_dict = {}
     for i in range(0, nrow):
@@ -831,7 +831,7 @@ def output_ifc_dict(mol, frag_frame: pd.DataFrame, done_smi: list[str]):
 def _write_frag_structure(frag_mol, xyz_list, symb_list, h_xyz, at_idx, atom_types):
     """get output structure"""
     # pylint:disable=too-many-arguments
-    print("in function")
+    # print("in function")
     num_atoms = len(symb_list)
     # smile = re.sub('\[[0-9]+\*\]', '*', Chem.MolToSmiles(frag_mol,canonical=False))
     charge = Chem.GetFormalCharge(frag_mol)
@@ -1251,7 +1251,7 @@ def count_groups_in_set(
 
     out_frame = pd.DataFrame()
     for i, inp in enumerate(list_of_inputs):
-        print(inp)
+        # print(inp)
         if cml_list:
             frame = identify_connected_fragments(
                 inp,
