@@ -23,7 +23,7 @@ jobs:
       run: |
         pip install --upgrade pip
         pip install -e .[testing]
-        pip install git+https://kmlefran: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@github.com/kmlefran/group_decomposition
+        pip install group_decomposition
 
     - name: Run test suite
       env:
@@ -44,7 +44,7 @@ jobs:
       run: |
         pip install --upgrade pip
         pip install -e .[docs]
-        pip install git+https://kmlefran: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@github.com/kmlefran/group_decomposition
+        pip install group_decomposition
     - name: Build docs
       run: cd docs && make
 
