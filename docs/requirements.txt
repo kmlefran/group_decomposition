@@ -6,3 +6,4 @@ markupsafe<2.1
 pandas
 numpy
 rdkit
+sphinx-rtd-theme
