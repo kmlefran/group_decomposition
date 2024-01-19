@@ -1,0 +1,8 @@
+sphinx
+sphinxcontrib-contentui
+sphinxcontrib-details-directive
+furo
+markupsafe<2.1
+pandas
+numpy
+rdkit
