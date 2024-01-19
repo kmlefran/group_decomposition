@@ -10,7 +10,6 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11"]
-        aiida-version: ["stable"]
     steps:
     - uses: actions/checkout@v2
 
@@ -29,7 +28,7 @@ jobs:
       env:
         # show timings of tests
         PYTEST_ADDOPTS: "--durations=0"
-      run: pytest --cov aiida_aimall --cov-append .
+      run: pytest --cov group_decomposition --cov-append .
 
   docs:
     runs-on: ubuntu-latest
