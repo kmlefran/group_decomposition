@@ -482,6 +482,8 @@ def count_uniques(
     if "atom_types" in col_names:
         type_list = frag_frame["atom_types"]
         type_inc = True
+    else:
+        type_inc = False
     if "count" in col_names:
         count_list = frag_frame["count"]
         count_inc = True
