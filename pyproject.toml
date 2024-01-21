@@ -35,10 +35,12 @@ Source = "https://github.com/kmlefran/group_decomposition"
 testing = [
     "pgtest~=1.3.1",
     "wheel~=0.31",
-    "coverage[toml]",
+    "coverage",
     "pytest~=6.0",
     "pytest-cov",
-    "rdkit"
+    "pytest-regressions~=2.3",
+    "rdkit",
+    "coveralls"
 ]
 pre-commit = [
     "pre-commit~=2.2",
@@ -77,10 +79,10 @@ filterwarnings = [
     "ignore::DeprecationWarning:yaml:",
 ]
 
-[tool.coverage.run]
+#[tool.coverage.run]
 # Configuration of [coverage.py](https://coverage.readthedocs.io)
 # reporting which lines of your plugin are covered by tests
-source=["group_decomposition"]
+#source=["group_decomposition"]
 
 [tool.isort]
 # Configuration of [isort](https://isort.readthedocs.io)
