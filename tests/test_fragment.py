@@ -14,13 +14,14 @@ sys.path.append(sys.path[0].replace("/tests", ""))
 # import unittest
 
 # class TestFragmenting(unittest.TestCase):
-def test_two_ethyls_in_smile():
-    """We should find two ethyls in this molecule"""
+def test_ether_rejoined():
+    """The that the monoatomic oxygen in the chain gets rejoined to the fragments"""
     smi = "c1ccc(c(c1)c2ccc(o2)C(=O)N3C[C@H](C4(C3)CC[NH2+]CC4)C(=O)NCCOCCO)F"
-    atframe = identify_connected_fragments(smi)
+    atframe = identify_connected_fragments(
+        smi, bb_patt="[$([C;X4;!R]):1]-[$([R,!$([C;X4]);!#0;!#9;!#17;!#35;!#1]):2]"
+    )
     uniqueframe = count_uniques(atframe)
-    numEt = list(uniqueframe[uniqueframe["Smiles"] == "*CC*"]["count"])[0]
-    assert numEt == 2
+    assert "*CCOCC*" in list(uniqueframe["Smiles"])
 
 
 def test_invalid_smiles_raises_ValueError():
