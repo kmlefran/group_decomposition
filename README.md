@@ -1,7 +1,7 @@
 [![ci](https://github.com/kmlefran/group_decomposition/actions/workflows/ci.yml/badge.svg)](https://github.com/kmlefran/group_decomposition/actions/workflows/ci.yml)
 [![Documentation Status](https://readthedocs.org/projects/group_decomposition/badge/?version=latest)](https://group_decomposition.readthedocs.io/en/latest/?badge=latest)
 [![Coverage Status](https://coveralls.io/repos/github/kmlefran/group_decomposition/badge.svg?branch=main)](https://coveralls.io/github/kmlefran/group_decomposition?branch=main)
-[![PyPI version][pypi-badge]](https://pypi.org/project/group_decomposition/)
+[![PyPI version](https://pypi.org/project/group_decomposition/)](https://pypi.org/project/group_decomposition/)
 # Identifying fragments in molecule SMILES codes
 
 Python functions to identify fragments in a molecule(or set of molecules) based on their SMILES codes, or .mol(and/or cml files). The fragments are chemically meaningful. Fragments identified include rings, linkers, side chains of molecules, and the functional groups(as defined by Ertl - heteroatoms and double bonds), and alkyl groups that compose them. There are two main functionalities currently, at the single molecule level, and at the batch level. At the single molecular level, the molecule is broken up into the fragments, and each fragment retains connectivity. At the batch level, for multiple molecules, connectivity is removed, and the unique fragments are identified, and their occurences counted. For example, this would identify that there are N methyl groups in the set of molecules.
