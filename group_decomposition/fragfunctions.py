@@ -345,6 +345,7 @@ def identify_connected_fragments(
         frag_frame["Parent"] = [mol] * len(frag_frame.index)
     if aiida:
         frag_frame = frag_frame.drop("Molecule", axis=1)
+
     return frag_frame
 
 
@@ -419,7 +420,10 @@ def _add_frag_comp(frag_frame, mol):
 
 
 def count_uniques(
-    frag_frame: pd.DataFrame, drop_attachments: bool = False, uni_smi_type: bool = False
+    frag_frame: pd.DataFrame,
+    drop_attachments: bool = False,
+    uni_smi_type: bool = False,
+    file_name: str = "",
 ) -> pd.DataFrame:
     r"""Identify unique fragments in a frame and count the number of times they occur
 
@@ -437,6 +441,8 @@ def count_uniques(
             if True, removes \* for fragments with more than one atom
         uni_smi_type: include atom types in determination of unique
             fragments. If false, only determine unique by SMILES
+        file_name: Name of file frame is generated from. Include if you wish to output to a fragments.csv the identity and
+            counts of fragments for the frame
 
     Returns:
         pandas data frame with columns 'Smiles', 'count' and 'Molecule',
@@ -596,6 +602,13 @@ def count_uniques(
         labels=unique_labels,
         at_types=unique_types,
     )
+    if file_name:
+        with open("fragments.csv", "a", encoding="utf-8") as fragment_file:
+            out_line = file_name
+            for _, row in un_frame.iterrows():
+                out_line = out_line + "," + row["Smiles"] + ":" + row["count"]
+            out_line += "\n"
+            fragment_file.write(out_line)
     # if atoms_inc:
     #     un_frame['Atoms'] = unique_atoms
     # if labels_inc:
@@ -1225,6 +1238,7 @@ def count_groups_in_set(
     cml_list=None,
     uni_smi_ty: bool = True,
     aiida: bool = False,
+    out_csv=False,
 ) -> pd.DataFrame:
     """Identify unique fragments in molecules defined in the list_of_smiles,
     and count the number of occurences for duplicates.
@@ -1241,6 +1255,8 @@ def count_groups_in_set(
             don't have four bonds, and are not H, halide, or placeholder
         uni_smi_type: if True, include atom types in determination of unique
             fragments. If false, only determine unique by SMILES
+        aiida: If True, this is running in an AiiDA workflow and we need to drop rdkit molecule columns
+        out_csv: if True, write fragments.csv with one row for each file, containing fragments in the file
 
     Returns:
         an output pd.DataFrame, with columns 'Smiles' for fragment Smiles,
@@ -1269,7 +1285,12 @@ def count_groups_in_set(
                 inp, bb_patt=bb_patt, input_type=input_type, include_parent=True
             )
         if frame is not None:
-            unique_frame = count_uniques(frame, drop_attachments, uni_smi_type=True)
+            if out_csv:
+                unique_frame = count_uniques(
+                    frame, drop_attachments, uni_smi_ty, file_name=inp
+                )
+            else:
+                unique_frame = count_uniques(frame, drop_attachments, uni_smi_ty)
             if out_frame.empty:
                 out_frame = unique_frame
             else:
