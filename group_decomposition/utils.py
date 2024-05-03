@@ -220,15 +220,15 @@ def _add_cml_single_atoms_bonds(el_list, bond_list):
     return rwmol
 
 
-def smiles_from_cml(cml_file, smile_tag="retrievium:inputSMILES"):
+def smiles_from_cml(cml_file, smile_tag="retrievium:finalCanonicalSMILES"):
     """Finds the Retreivium  SMILES in a cml file with a given label
 
     Args:
         cml_file: cml file name
-        smile_tag: the label fo the SMILEs in the cml file. Defaults to input SMILEs
+        smile_tag: the label fo the SMILEs in the cml file. Defaults to final Canonical
 
     Returns:
-        string of the input SMILES code tagged in the file as retrievium:inputSMILES
+        string of the input SMILES code tagged in the file as smile_tag
 
     Note:
         Must be used on .cml files from the Retrievium database https://retrievium.ca
@@ -270,6 +270,9 @@ def mol_from_cml(cml_file, input_type="cmlfile"):
 
     if input_type == "cmlfile":
         xyz_coords, at_types, bond_list, el_list, _ = data_from_cml(cml_file, True)
+        if not xyz_coords:
+            _write_error(f"Bad chemical identifiers {cml_file}\n")
+            return [None, None, None, None]
         smile = smiles_from_cml(cml_file)
     elif input_type == "cmldict":
         xyz_coords = cml_file["geom"]
@@ -511,6 +514,16 @@ def data_from_cml(cml_file, bonds=False):
     # pylint:disable=too-many-locals
     # pylint:disable=too-many-branches
     # pylint:disable=too-many-statements
+    # IF SMILES is bad, don't run
+    bad_smiles = False
+    with open(cml_file, encoding="utf-8") as cml_handle:
+        if "chemicalIdentifiersWarning" in cml_handle.read():
+            bad_smiles = True
+    if bad_smiles and bonds:
+        return None, None, None, None, None
+    if bad_smiles:
+        return None, None, None
+
     num_atom_array = 0
     geom_list = []
     n_atl = 0
@@ -519,8 +532,9 @@ def data_from_cml(cml_file, bonds=False):
     idx_list = []
     bond_list = []
     el_list = []
-    with open(cml_file, encoding="utf-8") as file:
-        for line in file:
+    with open(cml_file, encoding="utf-8") as cml_handle:
+        lines = cml_handle.readlines()
+        for line in lines:
             if "formalCharge" in line:
                 split_line = line.split(" ")
                 for word in split_line:

@@ -286,6 +286,8 @@ def identify_connected_fragments(
         mol, atomic_symb = mol_dict["Molecule"], mol_dict["atomic_symbols"]
         if cml_file:
             xyz_coords, atom_types, _, _, _ = utils.data_from_cml(cml_file)
+            if not xyz_coords:
+                return None
             # atom_types = utils.get_cml_atom_types(cml_file)
         else:
             xyz_coords = mol_dict["xyz_pos"]
