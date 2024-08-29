@@ -234,14 +234,11 @@ def smiles_from_cml(cml_file, smile_tag="retrievium:finalCanonicalSMILES"):
         Must be used on .cml files from the Retrievium database https://retrievium.ca
 
     """
-    flag = 0
     with open(cml_file, encoding="utf-8") as file:
-        for line in file:
-            if smile_tag in line:
-                flag = 1
-            elif flag == 1:
-                smile = line.split(">")[1].split("<")[0]
-                break
+        cml_lines = file.readlines()
+    index = [idx for idx, s in enumerate(cml_lines) if smile_tag in s][0] + 1
+    line = cml_lines[index]
+    smile = line.split(">")[1].split("<")[0]
     return smile
 
 
@@ -447,7 +444,7 @@ def _modAssignBondOrdersFromTemplate(refmol, mol, cml_file):
                 # smile = smiles_from_cml(cml_file)
                 er_message += _at_num_er(refmol2, mol2)
                 # smimol = Chem.MolFromSmiles()
-                _write_error(er_message)
+                _write_error(er_message + "\n")
                 return None
             if hasattr(mol2, "__sssAtoms"):  # pylint:disable=protected-access
                 mol2.__sssAtoms = None  # pylint:disable=protected-access # we don't want all bonds highlighted
@@ -456,7 +453,7 @@ def _modAssignBondOrdersFromTemplate(refmol, mol, cml_file):
                 f"No match between template smiles and connected geom for {cml_file}\n"
             )
             er_message += _at_num_er(refmol2, mol2)
-            _write_error(er_message)
+            _write_error(er_message + "\n")
             return None
     return mol2
 

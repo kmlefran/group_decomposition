@@ -1239,6 +1239,7 @@ def count_groups_in_set(
     uni_smi_ty: bool = True,
     aiida: bool = False,
     out_csv=False,
+    filename_list=[],
 ) -> pd.DataFrame:
     """Identify unique fragments in molecules defined in the list_of_smiles,
     and count the number of occurences for duplicates.
@@ -1268,7 +1269,7 @@ def count_groups_in_set(
         'Cc1nc2ccc(cc2s1)NC(=O)c3cc(ccc3N4CCCC4)S(=O)(=O)N5CCOCC5'],drop_attachments=False)
 
     """
-
+    # pylint:disable=dangerous-default-value
     out_frame = pd.DataFrame()
     for i, inp in enumerate(list_of_inputs):
         # print(inp)
@@ -1287,7 +1288,7 @@ def count_groups_in_set(
         if frame is not None:
             if out_csv:
                 unique_frame = count_uniques(
-                    frame, drop_attachments, uni_smi_ty, file_name=inp
+                    frame, drop_attachments, uni_smi_ty, file_name=filename_list[i]
                 )
             else:
                 unique_frame = count_uniques(frame, drop_attachments, uni_smi_ty)
