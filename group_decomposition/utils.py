@@ -253,7 +253,7 @@ def mol_from_cml(cml_file, input_type="cmlfile"):
 
     Args:
         cml_file: cml file name or dictionary containing cml data
-        input_type: cmlfile or cmldict. Use cmlfile if just raw cml file, use cmldict if dictionary
+        input_type: cmlfile or cmldict. Use cmlfile if just raw cml file name, use cmldict if dictionary
 
     Returns:
         list with elements: [Molecule, list of atom symbols in molecule,
@@ -265,12 +265,16 @@ def mol_from_cml(cml_file, input_type="cmlfile"):
 
     """
 
+    # extract relevant information out of cml file
     if input_type == "cmlfile":
         xyz_coords, at_types, bond_list, el_list, _ = data_from_cml(cml_file, True)
         if not xyz_coords:
             _write_error(f"Bad chemical identifiers {cml_file}\n")
             return [None, None, None, None]
+        # extract the finalCanonicalSmiles, smiles_from_cml by default gets this
         smile = smiles_from_cml(cml_file)
+    # if you've already parsed the cml into a dictionary with all the below keys,
+    # you can specify the input type as cmldict instead
     elif input_type == "cmldict":
         xyz_coords = cml_file["geom"]
         at_types = cml_file["atom_types"]
@@ -278,23 +282,26 @@ def mol_from_cml(cml_file, input_type="cmlfile"):
         el_list = cml_file["labels"]
         # charge = cml_file["charge"]
         smile = cml_file["smiles"]
+    else:
+        raise ValueError(
+            f'Incorrect input_type specified. Expected "cmlfile" or "cmldict", got {input_type} '
+        )
+    # create a framework molecule, just the atoms and single bonds connecting them
     rwmol = _add_cml_single_atoms_bonds(el_list, bond_list)
+
+    # some preprocessing steps for the molecule that I needed to do in order for the map to succeed.
     for atom in rwmol.GetAtoms():
         atom.SetNoImplicit(True)
-
     rwmol2 = Chem.RemoveHs(rwmol, implicitOnly=True, updateExplicitCount=False)
+
+    # Create the molecule with the correct bond orders.
+    # these atoms will not be in the same order as the cml file
     template = AllChem.MolFromSmiles(smile)
+    # Add the bond orders from the template to the connected framework
     bond_mol = _modAssignBondOrdersFromTemplate(template, rwmol2, cml_file)
-    # need rings for aromaticity check
-    # if os.path.isfile('error_log.txt'):
-    #     er_file = open('error_log.txt','a')
-    #     er_file.write(f'Could not sanitize {cml_file}\n')
-    #     er_file.close()
-    # else:
-    #     er_file = open('error_log.txt','w')
-    #     er_file.write(f'Could not sanitize {cml_file}\n')
-    #     er_file.close()
-    if bond_mol:
+
+    if bond_mol:  # if the match was a success
+        # Update the molecule object's information (aromaticity, rings, etc.)
         bond_mol.UpdatePropertyCache()
         Chem.GetSymmSSSR(bond_mol)
         try:
@@ -302,15 +309,10 @@ def mol_from_cml(cml_file, input_type="cmlfile"):
         except:  # pylint:disable=bare-except
             _write_error(f"Could not sanitize {cml_file}\n")
             return [None, None, None, None]
+        # return the molecule, which has correct bond orders now, a list of the elements, and xyz coordinates
+        # The indices of the atoms in this molecule match the indices of xyz_coords
         return [mol_with_atom_index(bond_mol), el_list, xyz_coords, at_types]
-        # if os.path.isfile('error_log.txt'):
-        #     er_file = open('error_log.txt','a')
-        #     er_file.write(f'No match between template smiles and connected geom for {cml_file}\n')
-        #     er_file.close()
-        # else:
-        #     er_file = open('error_log.txt','w')
-        #     er_file.write(f'No match between template smiles and connected geom for {cml_file}\n')
-        #     er_file.close()
+
     return [None, None, None, None]
 
 
@@ -598,6 +600,7 @@ def data_from_cml(cml_file, bonds=False):
     temp_frame = pd.DataFrame(list(zip(idx_list, type_list)), columns=["idx", "type"])
     temp_frame.sort_values(by="idx", inplace=True)
     if bonds:
+        # pylint:disable=possibly-used-before-assignment
         return [geom_list, list(temp_frame["type"]), bond_list, el_list, charge]
     return [geom_list, list(temp_frame["type"])]
 
@@ -716,7 +719,9 @@ def all_data_from_cml(data):
         "atom_types": list(temp_frame["type"]),
         "bonds": bond_list,
         "labels": el_list,
+        # pylint:disable=possibly-used-before-assignment
         "charge": charge,
+        # pylint:disable=possibly-used-before-assignment
         "multiplicity": multiplicity,
         "smiles": smile,  # pylint:disable=used-before-assignment
     }
